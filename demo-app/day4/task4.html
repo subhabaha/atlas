@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Feedback Loop, With Arithmetic · Day 4 Task 4</title>
+<meta name="description" content="Reference demo: calibration first, then a random-vs-uncertainty learning-curve experiment that reads off the labels you did not have to buy, the routing-and-review volume arithmetic, the capture schema, the train-or-evaluate leakage rule, and a named feedback element with an owner.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../index.html"><span class="logo">AC</span><span>Advanced AI Engineering<small>Demo Gallery</small></span></a>
+    <span class="spacer"></span>
+    <nav>
+      <a href="../index.html">◂ All demos</a>
+      <a href="../day5/task1.html">Next: Day 5 ▸</a>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">☾</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div class="crumbs"><a href="../index.html">Gallery</a> › Day 4 · Vision, MLOps &amp; Feedback Loops › Task 4</div>
+    <div class="tags">
+      <span class="badge b-blue">Day 4 · Task 4</span>
+      <span class="badge">Lab 4</span>
+      <span class="badge tag-mods">MODULE 4 · CALIBRATION FIRST · UNCERTAINTY SAMPLING · CAPTURE SCHEMA · VOLUME ARITHMETIC</span>
+    </div>
+    <h1>The Feedback Loop, With Arithmetic</h1>
+    <p class="tagline">Labelling the cases the model finds hard beats labelling at random by a wide margin — <strong>but only
+      if confidence is calibrated</strong>. Build the loop, prove with a measurement that it is worth building, and prove
+      with arithmetic that it can actually run.</p>
+  </div>
+
+  <!-- ---------------------------------------------------------- scenario -->
+  <section class="section" data-reveal>
+    <h2>The scenario</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <p>From a low-confidence prediction to a retrained, validated, deployed model. Uncertainty sampling selects the cases
+           the model is least sure about — and that only works if the model's confidence <em>means something</em>. Most neural
+           networks are over-confident, so the loop must <strong>fix calibration before it trusts a single confidence score</strong>.</p>
+        <p style="margin-bottom:0">Then two questions get answered with numbers: is active learning worth it (a learning-curve
+           experiment), and can the review workload it creates actually run (the volume arithmetic)?</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:.6rem">The apprentice <span class="note-sim">the analogy that makes it obvious</span></h3>
+        <div class="callout" style="margin:.2rem 0 0;background:var(--surface-2)">
+          <p style="margin:0">You would not train an apprentice by having them repeat the tasks they already do correctly. You would
+             put them on the jobs they find difficult, with someone watching. <strong>Active learning is that principle applied to a
+             training set</strong> — every uncertainty-selected label lands where the decision boundary is unclear, while random
+             labelling spends most of its budget on easy cases the model already handles.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- what to build -->
+  <section class="section" data-reveal>
+    <h2>What the attendees must build</h2>
+    <ul class="checklist grid-2 grid">
+      <li>Calibration measured <b>before</b> relying on confidence — reliability curve and ECE before &amp; after Platt scaling</li>
+      <li>Random vs uncertainty <b>learning curves</b>, accuracy against labels bought, from a 200-image seed to 1,200</li>
+      <li>The <b>label saving</b> read off as the horizontal distance between the curves at a stated target accuracy</li>
+      <li>A routing rule + <b>volume arithmetic on the diagram</b>: parts, deferral, reviews/shift, seconds/review, capacity</li>
+      <li>A <b>capture schema</b> written to on every review — including guideline version and reviewer attribution</li>
+      <li>The train-or-evaluate split assigned <b>at capture time</b>, demonstrably never both — Day 1's leakage rule, operational</li>
+      <li>Reviewer feedback closed <b>visibly</b>, as a named element with an owner — not an aspiration</li>
+      <li>The limit named: active learning targets epistemic uncertainty; your Task 1 kappa says how much of it is reducible</li>
+    </ul>
+  </section>
+
+  <!-- ---------------------------------------------------------- THE LOOP -->
+  <section class="section" data-reveal>
+    <h2>The live feedback loop</h2>
+
+    <!-- calibration first -->
+    <div class="card">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">Calibration first — because uncertainty sampling trusts the confidence score</div>
+          <div class="chart-sub">If the model is over-confident it selects the wrong examples and the whole loop underperforms for a reason nobody diagnoses. Plot reliability, compute ECE, fix it, re-measure — then proceed.</div>
+        </div>
+      </div>
+      <div class="grid grid-4 keep2" style="margin-bottom:1rem">
+        <div class="metric accent-bad"><div class="label">ECE · before</div><div class="value">0.14</div><div class="sub">over-confident — as most nets are</div></div>
+        <div class="metric accent-ok"><div class="label">ECE · after Platt</div><div class="value">0.03</div><div class="sub">a two-line fix</div></div>
+        <div class="metric"><div class="label">Fit slice</div><div class="value sm">held-out</div><div class="sub">never the training set</div></div>
+        <div class="metric"><div class="label">Consequence</div><div class="value sm">loop pays</div><div class="sub">vs quietly does not</div></div>
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <div class="chart-sub">Reliability curve — predicted confidence vs observed accuracy</div>
+          <div id="calib-chart"></div>
+        </div>
+        <div class="callout" style="margin:1.4rem 0 0;border-color:var(--ac-blue)">
+          <div class="k">Why it comes first</div>
+          <p style="margin:.3rem 0 0">Before scaling, when the model says 0.90 it is right about 76% of the time — so "least confident"
+            does not mean what uncertainty sampling assumes, and the loop selects poorly. Platt scaling on a held-out slice pulls the curve
+            onto the diagonal (ECE 0.14 → 0.03). It is the difference between an active-learning loop that pays and one that quietly does not.</p>
+          <p style="margin:.6rem 0 0"><b>The limit:</b> active learning reduces <em>epistemic</em> uncertainty — the kind more data fixes.
+            Where the task is genuinely ambiguous (aleatoric), labelling adds contradictory examples. Your Task 1 <b>κ 0.78</b> is how you know
+            which is which, and therefore whether the loop will pay at all.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- active learning experiment -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">Is active learning worth it? — random vs uncertainty sampling</div>
+          <div class="chart-sub">From a 200-image seed, add 100 labels at a time to 1,200: random, or the 100 the calibrated model is least sure about. The horizontal gap at your target accuracy is labels you did not have to pay for.</div>
+        </div>
+        <div class="control" style="min-width:280px">
+          <label>Target accuracy · <span class="readout" id="tgt-read">0.870</span></label>
+          <input type="range" id="tgt-slider" min="0.83" max="0.90" step="0.005" value="0.870">
+        </div>
+      </div>
+      <div class="grid grid-4 keep2" style="margin-bottom:1rem">
+        <div class="metric"><div class="label">Labels · random</div><div class="value sm" id="m-rand">≈ 850</div><div class="sub">to reach target</div></div>
+        <div class="metric accent-blue"><div class="label">Labels · uncertainty</div><div class="value sm" id="m-unc">≈ 470</div><div class="sub">to reach target</div></div>
+        <div class="metric accent-ok"><div class="label">Labels saved</div><div class="value" id="m-save">≈ 380</div><div class="sub" id="m-save-sub">not paid for · same accuracy</div></div>
+        <div class="metric"><div class="label">At €6 / label</div><div class="value sm" id="m-eur">€ 2.3k</div><div class="sub">per model refresh</div></div>
+      </div>
+      <div id="al-chart"></div>
+    </div>
+
+    <!-- routing + volume arithmetic -->
+    <div class="card" style="margin-top:1.1rem">
+      <div id="route-verdict" class="verdict v-ok" style="margin-bottom:1rem">
+        <span class="dot d-ok"></span>
+        <div>
+          <div class="vt">ROUTING FITS · 2,304 reviews/shift against a capacity of 2,880</div>
+          <div class="vs">The routing band 0.42–0.58 defers 4% — do the arithmetic on the diagram, in numbers, before choosing the band, not after.</div>
+        </div>
+      </div>
+      <div class="chart-title">The routing rule and its volume arithmetic — on the diagram, in numbers</div>
+      <div class="chart-sub">Which confidence range goes to review, plus any always-review classes. Then check it against real capacity — the same discipline that made Task 2's cost-optimal threshold unavailable.</div>
+      <div class="grid grid-2" style="margin-top:.8rem">
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Quantity</th><th class="num">Value</th></tr></thead>
+            <tbody>
+              <tr><td>Parts inspected / shift</td><td class="num">57,600</td></tr>
+              <tr><td>Routing band → review</td><td class="num">conf 0.42 – 0.58</td></tr>
+              <tr><td>Always-review class</td><td class="num">structural crack</td></tr>
+              <tr><td>Deferral rate</td><td class="num">4.0%</td></tr>
+              <tr><td>Reviews required / shift</td><td class="num">2,304</td></tr>
+              <tr><td>Seconds available / review</td><td class="num">~30 s (offline)</td></tr>
+              <tr><td>Reviewer capacity / shift</td><td class="num">2,880 (3 reviewers)</td></tr>
+              <tr><td>Does it fit?</td><td class="num">yes · 80% utilised</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout" style="margin:0">
+          <div class="k">The routing rule doubles as the label source</div>
+          <p style="margin:.3rem 0 0">The parts in the uncertain band are exactly the high-information cases uncertainty sampling wants — so the review loop
+            and the active-learning experiment are the <em>same</em> pipeline. Widen the band to 6% and reviews rise to 3,456, above the 2,880 capacity;
+            the routing threshold that produces it is not available until you add a reviewer or divert the part. Choose the band the capacity can clear,
+            then let those reviews become next month's training labels.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- capture schema + leakage split -->
+    <div class="grid grid-2" style="margin-top:1.1rem">
+      <div class="card">
+        <div class="chart-title">The capture schema — the step teams skip</div>
+        <div class="chart-sub">Teams build the review interface and never store the decision in a form that can reach training, so the most valuable data the system generates is discarded daily. Define it explicitly and write to it.</div>
+        <div class="table-wrap" style="margin-top:.7rem">
+          <table class="data">
+            <thead><tr><th>Field captured</th><th>Why</th></tr></thead>
+            <tbody>
+              <tr><td>Reviewer decision → corrected label</td><td class="muted">the training signal itself</td></tr>
+              <tr><td>Model proposal + confidence</td><td class="muted">where &amp; how it was wrong, not just that</td></tr>
+              <tr><td>Agreed / disagreed with model</td><td class="muted">the information-carrying subset</td></tr>
+              <tr><td>Reviewer, timestamp, guideline version</td><td class="muted">attribution — cross-guideline labels don't compare</td></tr>
+              <tr><td>Reconciled? by whom?</td><td class="muted">unreconciled disagreement is training noise</td></tr>
+              <tr><td>Split assignment (train | eval)</td><td class="muted">fixed at capture, never at training time</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small" style="margin:.7rem 0 0"><b>Make correcting easier than overriding.</b> If correcting takes four clicks and overriding takes one, you get overrides and no training data. The interface determines the data quality — an engineering decision disguised as a UX detail.</p>
+      </div>
+      <div class="card">
+        <div class="chart-title">The leakage rule — train <em>or</em> evaluate, never both</div>
+        <div class="chart-sub">Each new labelled case goes to training or evaluation, decided at capture time by a deterministic hash of the part id — Day 1's leakage lesson reappearing in operational form.</div>
+        <div class="grid grid-2" style="margin:.8rem 0">
+          <div class="metric accent-blue"><div class="label">→ training</div><div class="value sm" id="m-train">1,843</div><div class="sub">80% · hash(part_id)</div></div>
+          <div class="metric"><div class="label">→ evaluation</div><div class="value sm" id="m-eval">461</div><div class="sub">20% · disjoint</div></div>
+        </div>
+        <div class="metric accent-ok" style="margin-bottom:.8rem"><div class="label">Cases in both sets (leakage)</div><div class="value">0</div><div class="sub">split written at capture, not at training</div></div>
+        <div class="callout ok" style="margin:0">
+          <div class="k">And a protected set the loop never touches</div>
+          <p style="margin:.3rem 0 0">A separate held-out set is scored on a fixed schedule and refreshed from production only deliberately, with an expert verifying every added case. New cases flowing into both training and evaluation quietly inflate every future measurement — write the split once, at capture, and record it in the schema.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- close the loop -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="chart-title">Close the loop visibly — a named element with an owner</div>
+      <div class="chart-sub">The point that decides whether the loop still runs in six months. Correction rates decay within weeks if reviewers cannot see that their work mattered. This is a human factor, and it is more decisive than any technical choice in the loop.</div>
+      <div class="grid grid-3 keep2" style="margin-top:.8rem">
+        <div class="card" style="box-shadow:none;background:var(--surface-2)">
+          <div class="badge b-blue" style="margin-bottom:.5rem">Named element</div>
+          <h3 style="font-size:1.05rem;margin:0">Reviewer Impact Digest</h3>
+          <p class="small" style="margin:.4rem 0 0">Weekly note back to each reviewer: which of your corrections entered training, how much they moved recall, and on which slice.</p>
+        </div>
+        <div class="card" style="box-shadow:none;background:var(--surface-2)">
+          <div class="badge b-ok" style="margin-bottom:.5rem">Owner</div>
+          <h3 style="font-size:1.05rem;margin:0">Quality Lead · m.okonkwo</h3>
+          <p class="small" style="margin:.4rem 0 0">Named, not "the team". Accountable for the digest going out every week and for reconciling disagreements before they reach training.</p>
+        </div>
+        <div class="card" style="box-shadow:none;background:var(--surface-2)">
+          <div class="badge b-warn" style="margin-bottom:.5rem">Failure mode it prevents</div>
+          <h3 style="font-size:1.05rem;margin:0">Silent decay</h3>
+          <p class="small" style="margin:.4rem 0 0">Without visible impact, correction rates fall and the label supply that feeds the loop dries up — the loop stops compounding and nobody notices for a quarter.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- the trap -->
+  <section class="section" data-reveal>
+    <h2>The trap that makes the loop quietly stop paying</h2>
+    <div class="callout bad">
+      <div class="k">Uncertainty sampling on an un-calibrated model</div>
+      <p style="margin:.3rem 0 0">If confidence is not calibrated, "least confident" points to the wrong examples, and the loop under-performs for a reason nobody diagnoses — it just looks like active learning "did not help here".
+        Calibrate first (ECE 0.14 → 0.03, two lines), then select. Skipping this is the single most common way the loop is built and quietly wasted.</p>
+    </div>
+    <div class="callout warn">
+      <div class="k">New cases flowing into both training and evaluation</div>
+      <p style="margin:.3rem 0 0">Retrain on freshly reviewed data without a split assigned at capture time and the same corrected case can land in both sets — inflating every future measurement. This is Day 1's leakage lesson in operational form.
+        Write the train-or-evaluate split when the review is captured, not when the model is trained.</p>
+    </div>
+    <div class="callout">
+      <div class="k">A correction that costs four clicks</div>
+      <p style="margin:.3rem 0 0">If correcting a label takes four clicks and accepting the model takes one, reviewers accept — and the most valuable data the system produces is never captured. Build the interface so the correction is the default path;
+        the data quality is set by the UX, not the model.</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- lesson -->
+  <section class="section" data-reveal>
+    <div class="lesson">
+      <div class="k">The lesson this build makes undeniable</div>
+      <h3>A feedback loop only compounds if calibration, capture and validation are all present — most have none of the three.</h3>
+      <p style="margin-bottom:0">Active learning is worth a measured, budgeted amount — <b>hundreds of labels</b> you never have to buy — but only on a calibrated model, only where the uncertainty is the reducible kind,
+        and only if the reviews it generates <b>fit capacity</b> and are <b>captured</b> in a form that reaches training without leaking into evaluation. Close it visibly, with an owner, or it decays within weeks.</p>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="chart-title">Defend your result</div>
+      <p style="margin:.5rem 0 0;font-style:italic;color:var(--ink)">"Calibration error was <b>0.14</b> and is now <b>0.03</b>. To reach <b>0.87</b> accuracy, random sampling needed <b>≈ 850</b> labels
+        and uncertainty sampling needed <b>≈ 470</b> — a saving of <b>≈ 380</b> labels per refresh. At our routing threshold that is <b>2,304</b> reviews per shift against a capacity of <b>2,880</b>.
+        Our loop stores the corrected label, the model's proposal and confidence, the reviewer and guideline version — and new cases go to training or evaluation but never both, because the split is written at capture time."</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- pagenav -->
+  <nav class="pagenav">
+    <a href="task3.html"><div class="pn"><small>◂ Day 4 · Task 3</small><b>The MLOps Pipeline, Built</b></div></a>
+    <a href="../day5/task1.html"><div class="pn next"><small>Next ▸ Day 5 · Task 1</small><b>The Capstone</b></div></a>
+  </nav>
+
+  <p class="note-sim" style="margin-top:2rem">All figures on this page are generated in your browser from a seeded simulator matching the Task 4 specification. No backend, no external calls. Calibration, learning-curve, label-cost and capacity figures are illustrative placeholders consistent with the task pack.</p>
+
+</main>
+
+<footer class="footer"><div class="footer-inner"><div>Atlas Copco · Advanced AI Engineering Bootcamp — Reference Demo Gallery</div><div class="small">Day 4 · Task 4</div></div></footer>
+
+<script src="../assets/charts.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+/* ---- Calibration reliability curve --------------------------------------- */
+function drawCalib(){
+  const xs=[0.05,0.15,0.25,0.35,0.45,0.55,0.65,0.75,0.85,0.95];
+  const before=[0.08,0.13,0.20,0.28,0.37,0.44,0.52,0.60,0.68,0.76];
+  const after =[0.06,0.16,0.27,0.36,0.46,0.55,0.66,0.74,0.83,0.92];
+  AC.line(document.getElementById("calib-chart"), {
+    h:280, xmin:0, xmax:1, ymin:0, ymax:1, legend:true,
+    xticks:[{v:0,label:"0"},{v:0.25,label:".25"},{v:0.5,label:".50"},{v:0.75,label:".75"},{v:1,label:"1"}],
+    xlabel:"Predicted confidence", yfmt:v=>v.toFixed(2),
+    series:[
+      {name:"Perfect calibration", color:"var(--ink-3)", points:[[0,0],[1,1]], width:1.4, dashed:true},
+      {name:"Before (over-confident) · ECE 0.14", color:"var(--bad)", points:xs.map((x,i)=>[x,before[i]]), width:2.2, dots:true, dotR:2.4},
+      {name:"After Platt · ECE 0.03", color:"var(--ac-blue)", points:xs.map((x,i)=>[x,after[i]]), width:2.4, dots:true, dotR:2.4}
+    ]
+  });
+}
+
+/* ---- Active-learning learning curves ------------------------------------- */
+const AL_X   = [200,300,400,500,600,700,800,900,1000,1100,1200];
+const AL_RAND= [0.812,0.829,0.841,0.850,0.857,0.863,0.868,0.872,0.875,0.877,0.879];
+const AL_UNC = [0.812,0.843,0.862,0.874,0.882,0.888,0.892,0.895,0.897,0.899,0.900];
+const LABEL_COST = 6;
+// labels needed to first reach target accuracy (linear interp); null if never within budget
+function labelsFor(target, curve){
+  for(let i=0;i<curve.length;i++){
+    if(curve[i]>=target){
+      if(i===0) return AL_X[0];
+      const x0=AL_X[i-1], x1=AL_X[i], y0=curve[i-1], y1=curve[i];
+      return x0 + (target-y0)/(y1-y0)*(x1-x0);
+    }
+  }
+  return null;
+}
+let target=0.870;
+function drawAL(){
+  const lr=labelsFor(target,AL_RAND), lu=labelsFor(target,AL_UNC);
+  const vlines=[];
+  if(lu!=null) vlines.push({x:lu, color:"var(--ac-blue)", label:"unc "+Math.round(lu), dashed:false});
+  if(lr!=null) vlines.push({x:lr, color:"var(--c7)", label:"rand "+Math.round(lr), dashed:true});
+  AC.line(document.getElementById("al-chart"), {
+    h:300, xmin:200, xmax:1200, ymin:0.80, ymax:0.91, legend:true,
+    xticks:[{v:200,label:"200"},{v:400,label:"400"},{v:600,label:"600"},{v:800,label:"800"},{v:1000,label:"1000"},{v:1200,label:"1200"}],
+    xlabel:"Labels bought (from 200-image seed)", yfmt:v=>v.toFixed(2),
+    series:[
+      {name:"Random sampling", color:"var(--c7)", points:AL_X.map((x,i)=>[x,AL_RAND[i]]), width:2.2, dots:true, dotR:2},
+      {name:"Uncertainty sampling", color:"var(--ac-blue)", points:AL_X.map((x,i)=>[x,AL_UNC[i]]), width:2.6, dots:true, dotR:2}
+    ],
+    hlines:[{y:target, color:"var(--ok)", label:"target "+target.toFixed(3)}],
+    vlines
+  });
+  // metrics
+  document.getElementById("tgt-read").textContent = target.toFixed(3);
+  document.getElementById("m-rand").textContent = lr!=null ? "≈ "+Math.round(lr/10)*10 : "> 1,200";
+  document.getElementById("m-unc").textContent  = lu!=null ? "≈ "+Math.round(lu/10)*10 : "> 1,200";
+  const saveEl=document.getElementById("m-save"), subEl=document.getElementById("m-save-sub"), eurEl=document.getElementById("m-eur");
+  if(lr!=null && lu!=null){
+    const save=Math.max(0,Math.round((lr-lu)/10)*10);
+    saveEl.textContent="≈ "+save; subEl.textContent="not paid for · same accuracy";
+    eurEl.textContent="€ "+((save*LABEL_COST)/1000).toFixed(1)+"k";
+  } else if(lu!=null && lr==null){
+    saveEl.textContent="> 720"; subEl.textContent="random never reaches it within budget";
+    eurEl.textContent="unbounded";
+  } else {
+    saveEl.textContent="—"; subEl.textContent="target beyond both curves"; eurEl.textContent="—";
+  }
+}
+
+document.getElementById("tgt-slider").addEventListener("input", e=>{ target=+e.target.value; drawAL(); });
+
+function render(){ drawCalib(); drawAL(); }
+AC.renderAll(render);
+AC.onThemeChange(render);
+</script>
+</body>
+</html>

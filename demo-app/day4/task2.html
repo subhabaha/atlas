@@ -100,9 +100,9 @@
         </div>
       </div>
       <div class="grid grid-4 keep2" style="margin-bottom:1rem">
-        <div class="metric accent-blue"><div class="label">Expected cost / shift</div><div class="value" id="m-cost">€ 785k</div><div class="sub" id="m-cost-sub">−€86k vs global 0.5</div></div>
-        <div class="metric"><div class="label">False rejects / shift</div><div class="value sm" id="m-fr">9,815</div><div class="sub">good parts scrapped · €45 each</div></div>
-        <div class="metric accent-bad"><div class="label">Escapes / shift</div><div class="value sm" id="m-esc">181</div><div class="sub">missed cracks · €1,900 each</div></div>
+        <div class="metric accent-blue"><div class="label">Expected cost / shift</div><div class="value" id="m-cost">€ 810k</div><div class="sub" id="m-cost-sub">−€78k vs global 0.5</div></div>
+        <div class="metric"><div class="label">False rejects / shift</div><div class="value sm" id="m-fr">9,596</div><div class="sub">good parts scrapped · €45 each</div></div>
+        <div class="metric accent-bad"><div class="label">Escapes / shift</div><div class="value sm" id="m-esc">199</div><div class="sub">missed cracks · €1,900 each</div></div>
         <div class="metric accent-warn"><div class="label">Deferral rate</div><div class="value sm" id="m-def">12.0%</div><div class="sub" id="m-def-sub">→ 8,640 reviews / shift</div></div>
       </div>
       <div id="cost-chart"></div>
@@ -124,11 +124,11 @@
         <div>
           <div class="table-wrap" style="margin-top:.2rem">
             <table class="data">
-              <thead><tr><th>Class</th><th class="num">Threshold</th><th>Favours</th><th class="num">Cost/shift</th></tr></thead>
+              <thead><tr><th>Policy</th><th class="num">Threshold(s)</th><th>Favours</th><th class="num">Cost/shift</th></tr></thead>
               <tbody>
-                <tr><td>Global (single point)</td><td class="num">0.45</td><td>balance</td><td class="num">€ 785k</td></tr>
-                <tr><td>Structural crack (safety)</td><td class="num">0.31</td><td class="muted">recall</td><td class="num">€ 731k</td></tr>
-                <tr><td>Surface / cosmetic</td><td class="num">0.62</td><td class="muted">precision</td><td class="num">€ 731k</td></tr>
+                <tr><td>Single global point</td><td class="num">0.45</td><td>balance</td><td class="num">€ 810k</td></tr>
+                <tr><td>Per-class · structural crack</td><td class="num">0.31</td><td class="muted">recall</td><td class="num" rowspan="2" style="vertical-align:middle">€ 756k</td></tr>
+                <tr><td>Per-class · surface / cosmetic</td><td class="num">0.62</td><td class="muted">precision</td></tr>
               </tbody>
             </table>
           </div>
@@ -227,7 +227,7 @@
     <h2>The trap this report exists to close</h2>
     <div class="callout bad">
       <div class="k">Choosing the threshold before doing the arithmetic</div>
-      <p style="margin:.3rem 0 0">The cost curve says 0.45 and saves €86k/shift, so teams ship 0.45 — and discover on day one that it defers 8,600 parts to two review stations that can clear 2,400.
+      <p style="margin:.3rem 0 0">The cost curve says 0.45 and saves €78k/shift, so teams ship it — and discover on day one that it defers 8,640 parts to two review stations that can clear 2,400.
         The saving was never real, because <strong>the operating point was never available</strong>. Do the review arithmetic first; the threshold you can actually run is the one whose deferral fits.</p>
     </div>
     <div class="callout warn">
@@ -253,7 +253,7 @@
     </div>
     <div class="card" style="margin-top:1rem">
       <div class="chart-title">Defend your result</div>
-      <p style="margin:.5rem 0 0;font-style:italic;color:var(--ink)">"The cost-optimal threshold saves <b>€ 86k</b> per shift against 0.5, with no retraining, and per-class
+      <p style="margin:.5rem 0 0;font-style:italic;color:var(--ink)">"The cost-optimal threshold saves <b>€ 78k</b> per shift against 0.5, with no retraining, and per-class
         operating points add a further <b>€ 54k</b>. We pre-registered the re-labelling hypothesis and it <b>under-delivered</b> — significant at p=0.001 but +0.041/+0.052,
         below our +0.06 bar. At that operating point we defer <b>12%</b>, which is <b>8,640</b> reviews per shift against a capacity of <b>2,400</b>, so the threshold is
         <b>not available</b> until we add review stations or accept more escapes."</p>
@@ -282,7 +282,7 @@ const SECTIONS = [
   ["3","Per-class breakdown","","Recall 0.847 cracked / 0.955 uncracked — the defect class carries the error", "b-info"],
   ["4","Capture-condition analysis","","Low-light recall 0.79, −15 pts below the rest — a logged physical change", "b-info"],
   ["5","Three hypotheses","","Tiling · re-labelling · threshold — each measurable, tested, pass criterion set in advance", "b-info"],
-  ["6","Threshold analysis","","Cost-optimal at 0.45 saves €86k/shift; per-class points add €54k — no retraining", "b-blue"],
+  ["6","Threshold analysis","","Cost-optimal at 0.45 saves €78k/shift; per-class points add €54k — no retraining", "b-blue"],
   ["7","Recommendation","","Fix labels + capture first; the threshold gain is real but capacity-limited today", "b-ok"]
 ];
 document.getElementById("report-scaffold").innerHTML =
@@ -302,7 +302,7 @@ const DEF  = sample(6000, 0.70, 0.17, 4202);   // defect parts score high
 function fracGE(arr,t){ let lo=0,hi=arr.length; while(lo<hi){const m=(lo+hi)>>1; if(arr[m]<t) lo=m+1; else hi=m;} return (arr.length-lo)/arr.length; }
 function fracLT(arr,t){ return 1-fracGE(arr,t); }
 function fracBand(arr,t,w){ return fracGE(arr,t-w)-fracGE(arr,t+w); }
-const BAND = 0.043;
+const BAND = 0.040;
 
 function metrics(t){
   const fr = GOOD_SHIFT*fracGE(GOOD,t);      // good parts rejected (false reject)
@@ -375,7 +375,7 @@ function drawStatic(){
     data:[
       {label:"Global 0.5", value:Math.round(cGlobal/1000), color:"var(--c7)"},
       {label:"Single optimal", value:Math.round(cStar/1000), color:"var(--ac-blue)"},
-      {label:"Per-class", value:731, color:"var(--ok)"}
+      {label:"Per-class", value:756, color:"var(--ok)"}
     ]
   });
   // hypothesis per-class gain vs +0.06 bar (bar heights, colour = pass/fail)
