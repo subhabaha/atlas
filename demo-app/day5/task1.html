@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Field-Service Agent System · Day 5 Task 1</title>
+<meta name="description" content="Reference demo: six agents, two contracts and per-step measurement — where the largest reliability gain comes from making the system less agentic, not more.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../index.html"><span class="logo">AC</span><span>Advanced AI Engineering<small>Demo Gallery</small></span></a>
+    <span class="spacer"></span>
+    <nav>
+      <a href="../index.html">◂ All demos</a>
+      <a href="task2.html">Next: One Reusable Skill ▸</a>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">☾</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div class="crumbs"><a href="../index.html">Gallery</a> › Day 5 · Agents, Skills, Guardrails &amp; the Capstone › Task 1</div>
+    <div class="tags">
+      <span class="badge b-blue">Day 5 · Task 1</span>
+      <span class="badge">Labs 1 &amp; 2</span>
+      <span class="badge tag-mods">MODULES 1 &amp; 2 · COMPOUNDING ERROR · PER-STEP SUCCESS · CONTRACTS · APPROVAL GATES</span>
+    </div>
+    <h1>The Field-Service Agent System</h1>
+    <p class="tagline">Autonomy multiplies error rather than adding it. A step that is <strong>90%</strong> reliable is 90% over one step,
+      73% over three, and <strong>43% over eight</strong>. Everything on this page — the contracts, the per-step spans, the gates —
+      is a response to that one table. The largest reliability gain comes from making the system <em>less</em> agentic.</p>
+  </div>
+
+  <!-- ---------------------------------------------------------- scenario -->
+  <section class="section" data-reveal>
+    <h2>The scenario</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <p>An engineer is stood at a machine. The system must interpret the symptoms, find the right procedure <b>for that
+           revision</b>, check what has been done before, propose an action, reserve the parts and file the report. Six
+           responsibilities — and exactly one of them takes an <strong>irreversible</strong> action.</p>
+        <p style="margin-bottom:0">The runtime is ~150 lines you wrote yourself: a loop with a step budget, a cost budget,
+           structured state, and a span emitted per step. No framework — you need to see every step boundary, because
+           <strong>the step boundaries are the lesson.</strong></p>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:.6rem">Bounds before behaviour <span class="note-sim">(set in code before the first run)</span></h3>
+        <dl class="kv">
+          <dt>MAX_STEPS</dt><dd>12 — hard stop, not a suggestion</dd>
+          <dt>MAX_RETRIES</dt><dd>2 per step</dd>
+          <dt>MAX_TOKENS_PER_RUN</dt><dd>40,000</dd>
+          <dt>MAX_COST_PER_RUN</dt><dd>€0.40 — the run aborts, loudly</dd>
+          <dt>MAX_DELEGATION_DEPTH</dt><dd>3 — stops circular delegation</dd>
+          <dt>Scope</dt><dd>40 scenarios · 8 steps · span per step</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- what to build -->
+  <section class="section" data-reveal>
+    <h2>What the attendees must build</h2>
+    <ul class="checklist grid-2 grid">
+      <li>All five budgets set in code before the first run, with the abort path tested</li>
+      <li>Six agents, each with its tools, authorisation boundary, and <b>what it may not do</b></li>
+      <li>Two full contracts — including the context boundary and what is deliberately withheld</li>
+      <li>A per-step success table across 40 scenarios: attempted · succeeded · retried · escalated · tokens · latency</li>
+      <li><b>Predicted</b> end-to-end (product of per-step rates) versus the <b>observed</b> end-to-end</li>
+      <li>Two deterministic steps converted to plain code, with the before-and-after on success, cost and latency</li>
+      <li>An approval gate on the spare-parts action, gated on <b>irreversibility</b> — not confidence</li>
+      <li>The gate timed with an outside approver who never saw the code</li>
+    </ul>
+  </section>
+
+  <!-- ---------------------------------------------------------- THE CONSOLE -->
+  <section class="section" data-reveal>
+    <h2>The live system</h2>
+
+    <div id="verdict" class="verdict v-warn" style="margin-bottom:1rem">
+      <span class="dot d-warn"></span>
+      <div>
+        <div class="vt">AMBER · Eight steps at ~90% compound to 49% end-to-end — the chain, not any one step, is the problem</div>
+        <div class="vs">Weakest step (parts lookup) 86%. Converting the two deterministic steps to code lifts observed end-to-end from 46% to 60% at lower cost and latency — more than any prompt change achieved.</div>
+      </div>
+    </div>
+
+    <!-- compounding calculator -->
+    <div class="card">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">The arithmetic that shapes the whole day — reliability<sup>steps</sup></div>
+          <div class="chart-sub">Autonomy multiplies error. Move the sliders: end-to-end success is the per-step rate raised to the number of steps.</div>
+        </div>
+        <div class="control-row">
+          <div class="control">
+            <label>Per-step reliability · <span class="readout" id="p-read">90%</span></label>
+            <input type="range" id="p-slider" min="70" max="99" step="1" value="90">
+          </div>
+          <div class="control">
+            <label>Steps in chain · <span class="readout" id="n-read">8</span></label>
+            <input type="range" id="n-slider" min="1" max="12" step="1" value="8">
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-4 keep2" style="margin-bottom:1rem">
+        <div class="metric accent-blue"><div class="label">End-to-end success</div><div class="value" id="m-e2e">43%</div><div class="sub" id="m-e2e-sub">0.90 ^ 8</div></div>
+        <div class="metric"><div class="label">Over 3 steps</div><div class="value sm" id="m-3">72.9%</div><div class="sub">0.90 ^ 3</div></div>
+        <div class="metric"><div class="label">Failure per run</div><div class="value sm" id="m-fail">57%</div><div class="sub">at least one step fails</div></div>
+        <div class="metric"><div class="label">Add one more step</div><div class="value sm" id="m-margin">−4.3 pts</div><div class="sub">marginal cost of autonomy</div></div>
+      </div>
+      <div id="compound-chart"></div>
+      <div class="legend" id="compound-legend"></div>
+      <p class="small" style="margin:.7rem 0 0">A single weak step at 70% drags an otherwise sound eight-step chain below 50%. An end-to-end
+        figure tells you the agent failed — it never tells you <em>where</em>. That is the argument for per-step observability.</p>
+    </div>
+
+    <!-- six agents -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="chart-title">Six agents — tools, authorisation boundary, and what each may not do</div>
+      <div class="chart-sub">The third column is the one teams omit, and it is the one that bounds the blast radius when an agent is confused or compromised.</div>
+      <div class="table-wrap" style="margin-top:.7rem">
+        <table class="data">
+          <thead><tr><th>Agent</th><th>Tools</th><th>Authorisation boundary</th><th>What it may <em>not</em> do</th></tr></thead>
+          <tbody>
+            <tr><td><b>Diagnostic</b></td><td class="mono">telemetry.read · doc-search</td><td>Read-only. No write, no reserve.</td><td class="muted">Decide the action; declare a fault below its confidence floor rather than guess</td></tr>
+            <tr><td><b>Manual retrieval</b></td><td class="mono">doc-search · retrieval-index</td><td>Access-filtered to the caller's role &amp; asset revision <span class="badge b-info">Days 2 &amp; 3</span></td><td class="muted">Return a procedure for a different revision; surface a document the caller can't see</td></tr>
+            <tr><td><b>Maintenance recommendation</b></td><td class="mono">ticket-history · rules</td><td>Recommends. Does not commit.</td><td class="muted">Reserve parts, close a ticket, or notify a customer</td></tr>
+            <tr><td><b>Spare parts</b> <span class="badge b-bad">IRREVERSIBLE · GATED</span></td><td class="mono">parts-catalogue · reserve()</td><td>May reserve only after human approval</td><td class="muted">Reserve or order without an approved gate; exceed the run cost budget</td></tr>
+            <tr><td><b>Report generation</b></td><td class="mono">record.write</td><td>Writes only a validated, schema-conformant record</td><td class="muted">Write to the system of record before validation passes; invent fields</td></tr>
+            <tr><td><b>Human approval</b></td><td class="mono">approve() · reject()</td><td>The only path to an irreversible action</td><td class="muted">Be bypassed by any agent; auto-approve on a timeout</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- two contracts -->
+    <div class="grid grid-2" style="margin-top:1.1rem">
+      <div class="card">
+        <div class="chart-title">Contract · Diagnostic agent</div>
+        <div class="chart-sub">Written to be implemented from — another team could build it without asking a question.</div>
+        <dl class="kv" style="margin-top:.7rem">
+          <dt>Role</dt><dd>Turn symptoms + telemetry into a ranked fault hypothesis</dd>
+          <dt>Input</dt><dd>{ symptoms:str[req], asset_id:str[req], telemetry:obj } · validated against schema</dd>
+          <dt>Output</dt><dd>{ fault, confidence∈[0,1], alternatives[], "insufficient" }</dd>
+          <dt>Allowed tools</dt><dd>telemetry.read, doc-search — <b>not</b> reserve(), record.write</dd>
+          <dt>Failure</dt><dd>Returns status:"insufficient" with reason; caller must not read it as success</dd>
+          <dt>Escalation</dt><dd>If top-2 hypotheses within 0.1, hand to human — a rule, not a confidence threshold</dd>
+          <dt>Context boundary</dt><dd>Receives the asset &amp; symptoms only. <b>Withholds</b> the customer record and prior conversation.</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <div class="chart-title">Contract · Manual-retrieval agent</div>
+        <div class="chart-sub">The context-boundary row is the one teams overlook, every time.</div>
+        <dl class="kv" style="margin-top:.7rem">
+          <dt>Role</dt><dd>Return the procedure for this asset <em>at this revision</em></dd>
+          <dt>Input</dt><dd>{ asset_id:str[req], revision:str[req], role:str[req] } · rejected if revision absent</dd>
+          <dt>Output</dt><dd>{ doc_id, section, citations[], "no_match" } — uncertainty as an empty match, never a guess</dd>
+          <dt>Allowed tools</dt><dd>doc-search, retrieval-index with metadata filter — <b>not</b> the full corpus</dd>
+          <dt>Failure</dt><dd>Returns "no_match" when no revision-correct procedure exists; never a near-miss revision</dd>
+          <dt>Escalation</dt><dd>If the asset revision is unknown, stop and ask — do not retrieve "closest"</dd>
+          <dt>Context boundary</dt><dd>Receives asset_id, revision, role. <b>Withholds</b> the full conversation — cost and a security exposure both.</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- per-step measurement -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">Measure per step, not end to end — 40 scenarios</div>
+          <div class="chart-sub">Per-step success is the metric that matters most and is measured least. Instrument every step separately from day one.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="deterministic-toggle"><span class="track"></span>Convert 2 steps to code</label>
+      </div>
+      <div class="grid grid-4 keep2" style="margin-bottom:1rem">
+        <div class="metric"><div class="label">Weakest step</div><div class="value sm" id="m-weak">86%</div><div class="sub" id="m-weak-name">parts lookup (step 7)</div></div>
+        <div class="metric accent-blue"><div class="label">Predicted end-to-end</div><div class="value sm" id="m-pred">49%</div><div class="sub">product of per-step rates</div></div>
+        <div class="metric accent-warn"><div class="label">Observed end-to-end</div><div class="value sm" id="m-obs">46%</div><div class="sub" id="m-obs-sub">3 pts below predicted — mild step coupling</div></div>
+        <div class="metric"><div class="label">Escalations</div><div class="value sm" id="m-esc">6 / 40</div><div class="sub">handed to a human, correctly</div></div>
+      </div>
+      <div id="perstep-chart"></div>
+      <div class="legend" id="perstep-legend"></div>
+      <p class="small" style="margin:.7rem 0 0">Predicted (49%) versus observed (46%): a substantial disagreement would mean the steps are not
+        independent — itself a finding worth reporting. Here the 3-point gap flags mild coupling between diagnosis and retrieval.</p>
+    </div>
+
+    <!-- deterministic conversion -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="chart-title">The experiment — make it less agentic, and measure the gain</div>
+      <div class="chart-sub">Two steps are lookups and format conversions, not judgement: <b>parts availability</b> and <b>report formatting</b>. Replace them with plain functions — no model call at all.</div>
+      <div class="grid grid-3 keep2" style="margin-top:.9rem">
+        <div class="card" style="background:var(--surface-2)">
+          <div class="label" style="font-size:.74rem;color:var(--ink-3);font-weight:650;text-transform:uppercase;letter-spacing:.03em">End-to-end success</div>
+          <div style="display:flex;align-items:baseline;gap:.5rem;margin-top:.3rem">
+            <span class="value" style="font-family:var(--mono);font-size:1.7rem;font-weight:700;color:var(--ink-3)">46%</span>
+            <span style="color:var(--ink-3)">→</span>
+            <span class="value" style="font-family:var(--mono);font-size:1.9rem;font-weight:700;color:var(--ok)">60%</span>
+          </div>
+          <div class="sub" style="font-size:.82rem;color:var(--ink-3);margin-top:.25rem">+14 points · beats every prompt change tried</div>
+        </div>
+        <div class="card" style="background:var(--surface-2)">
+          <div class="label" style="font-size:.74rem;color:var(--ink-3);font-weight:650;text-transform:uppercase;letter-spacing:.03em">Cost per run</div>
+          <div style="display:flex;align-items:baseline;gap:.5rem;margin-top:.3rem">
+            <span class="value" style="font-family:var(--mono);font-size:1.7rem;font-weight:700;color:var(--ink-3)">€0.24</span>
+            <span style="color:var(--ink-3)">→</span>
+            <span class="value" style="font-family:var(--mono);font-size:1.9rem;font-weight:700;color:var(--ok)">€0.16</span>
+          </div>
+          <div class="sub" style="font-size:.82rem;color:var(--ink-3);margin-top:.25rem">−33% · two model calls removed</div>
+        </div>
+        <div class="card" style="background:var(--surface-2)">
+          <div class="label" style="font-size:.74rem;color:var(--ink-3);font-weight:650;text-transform:uppercase;letter-spacing:.03em">p95 latency</div>
+          <div style="display:flex;align-items:baseline;gap:.5rem;margin-top:.3rem">
+            <span class="value" style="font-family:var(--mono);font-size:1.7rem;font-weight:700;color:var(--ink-3)">14.2s</span>
+            <span style="color:var(--ink-3)">→</span>
+            <span class="value" style="font-family:var(--mono);font-size:1.9rem;font-weight:700;color:var(--ok)">9.1s</span>
+          </div>
+          <div class="sub" style="font-size:.82rem;color:var(--ink-3);margin-top:.25rem">−36% · deterministic steps are instant</div>
+        </div>
+      </div>
+      <div class="grid grid-2" style="margin-top:1.1rem">
+        <div>
+          <div class="chart-sub">Per-step success — baseline versus after converting steps 7 &amp; 8 to code (they become 100%, cannot fail probabilistically)</div>
+          <div id="convert-chart"></div>
+          <div class="legend" id="convert-legend"></div>
+        </div>
+        <div>
+          <div class="chart-sub">Where the end-to-end gain comes from — because the chain multiplies, the gain is multiplicative, not additive</div>
+          <div id="gain-chart"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- approval gate -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">The approval gate — designed to be usable, or it is rubber-stamped within a fortnight</div>
+          <div class="chart-sub">Gated on <b>irreversibility</b>, not on model confidence. The approver gets the action, the reasoning, the evidence, and one click.</div>
+        </div>
+        <span class="chip">⏱ outside approver decided in <b class="readout" style="margin-left:.2rem">18 s</b></span>
+      </div>
+      <div class="grid grid-2" style="margin-top:.4rem">
+        <div class="card" style="background:var(--surface-2)">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
+            <span class="badge b-bad">Gate · irreversible action</span>
+            <span class="badge b-warn">reserves stock · commits €486</span>
+          </div>
+          <h3 style="margin:.2rem 0 .5rem;font-size:1.05rem">Proposed action</h3>
+          <p style="margin:0 0 .7rem"><b>Reserve 2 × rotor-bearing kit</b> (P/N 2906-8811-00) from Antwerp DC against work order WO-4471. Estimated €486.</p>
+          <h3 style="margin:.4rem 0 .3rem;font-size:.95rem">Reasoning</h3>
+          <p class="small" style="margin:0 0 .6rem">Diagnostic: bearing-wear signature on GA-90 element, confidence 0.88. Procedure R7 (revision-matched) specifies bearing replacement. Ticket history shows the same fault cleared by this kit twice on sister assets.</p>
+          <h3 style="margin:.4rem 0 .3rem;font-size:.95rem">Evidence</h3>
+          <dl class="kv" style="font-size:.85rem">
+            <dt>Telemetry</dt><dd>vib RMS 6.2 mm/s ↑, band 3–5×</dd>
+            <dt>Procedure</dt><dd>doc R7 §4.2 · rev-matched</dd>
+            <dt>Stock</dt><dd>Antwerp DC · 5 on hand</dd>
+          </dl>
+          <div class="control-row" style="margin-top:.9rem">
+            <button class="btn btn-primary btn-sm" id="gate-approve">✓ Approve &amp; reserve</button>
+            <button class="btn btn-ghost btn-sm" id="gate-reject">✕ Reject</button>
+          </div>
+          <div id="gate-status" class="callout" style="margin:.9rem 0 0;display:none"></div>
+        </div>
+        <div class="card">
+          <div class="chart-title">Gate on irreversibility — not on these</div>
+          <div class="table-wrap" style="margin-top:.6rem">
+            <table class="data">
+              <thead><tr><th>Gate on</th><th>Not on</th><th>Why</th></tr></thead>
+              <tbody>
+                <tr><td><b>Irreversibility</b></td><td class="muted">Model confidence</td><td class="muted">Confidence is not a safety property, and is frequently miscalibrated</td></tr>
+                <tr><td><b>Safety relevance</b></td><td class="muted">Financial threshold</td><td class="muted">The cost of being wrong matters, not how much work was done</td></tr>
+                <tr><td><b>External visibility</b></td><td class="muted">Step count</td><td class="muted">A simple action can be the dangerous one</td></tr>
+                <tr><td><b>Policy-defined</b></td><td class="muted">Task complexity</td><td class="muted">Anything a customer or supplier sees needs a person</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="small" style="margin:.7rem 0 0"><b>Watch for:</b> a gate that makes the approver reconstruct the agent's reasoning
+            from logs provides the appearance of control and none of the substance — worse than no gate, because everyone believes it works.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- the trap -->
+  <section class="section" data-reveal>
+    <h2>The trap Copilot will hand you</h2>
+    <div class="callout bad">
+      <div class="k">A sub-agent that is a tool with extra steps</div>
+      <p style="margin:.3rem 0 0">Copilot will happily turn every responsibility into an autonomous peer that calls a model. Most of them are
+        lookups, calculations, format conversions and threshold comparisons — <strong>code, not judgement</strong>. Every one you leave as a model
+        call is a step that can fail probabilistically, and because the chain multiplies, it drags the whole run down. Prefer workflow-agent and
+        supervisor-worker patterns over peer collaboration.</p>
+    </div>
+    <div class="callout warn">
+      <div class="k">Passing the whole conversation to the sub-agent</div>
+      <p style="margin:.3rem 0 0">It is convenient, it is expensive, and it frequently means sending a sub-agent data it has no authorisation to see.
+        Pass what the contract requires and nothing more. This is a cost problem <em>and</em> a security problem, and it is invisible until someone
+        audits it — which happens in Task 3.</p>
+    </div>
+    <div class="callout">
+      <div class="k">Gating on confidence instead of irreversibility</div>
+      <p style="margin:.3rem 0 0">A 0.97-confidence reservation is still a reservation. Confidence is not a safety property. Gate the action that
+        cannot be undone, regardless of how sure the model claims to be — and write the gated list down where it can be reviewed.</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- lesson -->
+  <section class="section" data-reveal>
+    <div class="lesson">
+      <div class="k">The lesson this build makes undeniable</div>
+      <h3>Replacing two agents with deterministic code raises end-to-end reliability more than any prompt change will.</h3>
+      <p style="margin-bottom:0">Autonomy multiplies error. The reliability of an eight-step chain is the product of eight per-step rates, so
+        every step you convert from a probabilistic model call to a plain function is a step that <b>cannot fail</b> — and the gain compounds through
+        the whole chain. Nothing today is about making agents more autonomous.</p>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="chart-title">Defend your result</div>
+      <p style="margin:.5rem 0 0;font-style:italic;color:var(--ink)">“Our weakest step ran at <b>86%</b>, which predicted <b>49%</b> end to end; we observed
+        <b>46%</b>. Converting <b>parts lookup</b> and <b>report formatting</b> to code moved end-to-end success from <b>46%</b> to <b>60%</b>, cost from
+        <b>€0.24</b> to <b>€0.16</b>, and p95 latency from <b>14.2 s</b> to <b>9.1 s</b>. Our gate fires on <b>irreversibility</b>, and an outside approver used it in <b>18 seconds</b>.”</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- pagenav -->
+  <nav class="pagenav">
+    <a href="../day4/task4.html"><div class="pn"><small>◂ Prev · Day 4 · Task 4</small><b>Production Monitoring &amp; Drift</b></div></a>
+    <a href="task2.html"><div class="pn next"><small>Next ▸ Day 5 · Task 2</small><b>One Reusable Skill</b></div></a>
+  </nav>
+
+  <p class="note-sim" style="margin-top:2rem">All figures on this page are generated in your browser from a seeded simulator matching the task specification. No backend, no external calls. Cost and latency figures are the illustrative placeholders from the task pack.</p>
+
+</main>
+
+<footer class="footer"><div class="footer-inner"><div>Atlas Copco · Advanced AI Engineering Bootcamp — Reference Demo Gallery</div><div class="small">Day 5 · Task 1</div></div></footer>
+
+<script src="../assets/charts.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+/* ---- state ---------------------------------------------------------------- */
+let P = 0.90, N = 8, deterministic = false;
+
+/* per-step model of the 8-step pipeline (illustrative, internally consistent) */
+const STEPS = [
+  {k:"S1", name:"Symptom parse",        agent:"Diagnostic",    base:0.95, det:false},
+  {k:"S2", name:"Fault hypothesis",     agent:"Diagnostic",    base:0.90, det:false},
+  {k:"S3", name:"Manual retrieval",     agent:"Manual",        base:0.93, det:false},
+  {k:"S4", name:"Revision match",       agent:"Manual",        base:0.88, det:false},
+  {k:"S5", name:"History check",        agent:"Maint.",        base:0.96, det:false},
+  {k:"S6", name:"Action recommend",     agent:"Maint.",        base:0.91, det:false},
+  {k:"S7", name:"Parts lookup",         agent:"Spare parts",   base:0.86, det:true},  // deterministic candidate
+  {k:"S8", name:"Report formatting",    agent:"Report",        base:0.94, det:true}   // deterministic candidate
+];
+function stepRate(s){ return (deterministic && s.det) ? 1.00 : s.base; }
+function predictedE2E(){ return STEPS.reduce((a,s)=>a*stepRate(s),1); }
+
+/* ---- compounding calculator ---------------------------------------------- */
+function drawCompound(){
+  const e2e = Math.pow(P, N);
+  document.getElementById("p-read").textContent = Math.round(P*100)+"%";
+  document.getElementById("n-read").textContent = N;
+  document.getElementById("m-e2e").textContent = (e2e*100).toFixed(e2e<0.1?1:0)+"%";
+  document.getElementById("m-e2e-sub").textContent = P.toFixed(2)+" ^ "+N;
+  document.getElementById("m-3").textContent = (Math.pow(P,3)*100).toFixed(1)+"%";
+  document.getElementById("m-fail").textContent = ((1-e2e)*100).toFixed(0)+"%";
+  document.getElementById("m-margin").textContent = "−"+((Math.pow(P,N)-Math.pow(P,N+1))*100).toFixed(1)+" pts";
+
+  const refs = [
+    {p:0.99, color:"var(--c5)", name:"99% per step"},
+    {p:0.95, color:"var(--c2)", name:"95% per step"},
+    {p:0.80, color:"var(--c6)", name:"80% per step"}
+  ];
+  const mkPts = p => { const a=[]; for(let n=1;n<=12;n++) a.push([n, Math.pow(p,n)*100]); return a; };
+  const series = refs.map(r=>({name:r.name, color:r.color, points:mkPts(r.p), width:1.4, dashed:true}))
+    .concat([{name:Math.round(P*100)+"% per step (selected)", color:"var(--ac-blue)", points:mkPts(P), width:2.6, dots:true, dotR:2.4}]);
+  AC.line(document.getElementById("compound-chart"), {
+    h:300, ymin:0, ymax:100, xmin:1, xmax:12, legend:false,
+    xticks:[1,2,3,4,5,6,8,10,12].map(v=>({v,label:""+v})),
+    xlabel:"Number of sequential steps", ylabel:"End-to-end success (%)", yfmt:v=>v.toFixed(0),
+    series,
+    markers:[{x:N, y:e2e*100, color:"var(--ac-blue)", label:(e2e*100).toFixed(0)+"%", r:4.5}],
+    vlines:[{x:N, color:"var(--ink-3)", label:"", dashed:true}]
+  });
+  document.getElementById("compound-legend").innerHTML =
+    series.slice().reverse().map(s=>`<span class="li"><span class="sw" style="background:${s.color}"></span>${s.name}</span>`).join("");
+}
+
+/* ---- per-step chart ------------------------------------------------------- */
+function drawPerStep(){
+  const data = STEPS.map(s=>{
+    const r = stepRate(s);
+    const isWeak = !deterministic && s.base === Math.min(...STEPS.map(x=>x.base));
+    return {label:s.k, value:+(r*100).toFixed(0),
+      color: (deterministic && s.det) ? "var(--ok)" : (isWeak ? "var(--bad)" : "var(--c1)")};
+  });
+  AC.bar(document.getElementById("perstep-chart"), {h:230, data, min:60, max:100, ticks:4,
+    vfmt:v=>v.toFixed(0)+"%", dp:0});
+  document.getElementById("perstep-legend").innerHTML =
+    '<span class="li"><span class="sw" style="background:var(--c1)"></span>model step</span>'+
+    '<span class="li"><span class="sw" style="background:var(--bad)"></span>weakest step</span>'+
+    (deterministic?'<span class="li"><span class="sw" style="background:var(--ok)"></span>converted to code (100%)</span>':'');
+
+  const pred = predictedE2E();
+  const obs = deterministic ? 0.60 : 0.46;
+  const weak = STEPS.reduce((m,s)=> stepRate(s)<stepRate(m)?s:m, STEPS[0]);
+  document.getElementById("m-weak").textContent = deterministic ? "88%" : "86%";
+  document.getElementById("m-weak-name").textContent = deterministic ? "revision match (step 4)" : "parts lookup (step 7)";
+  document.getElementById("m-pred").textContent = (pred*100).toFixed(0)+"%";
+  document.getElementById("m-obs").textContent = (obs*100).toFixed(0)+"%";
+  document.getElementById("m-obs-sub").textContent = ((pred-obs)*100).toFixed(0)+" pts below predicted — mild step coupling";
+}
+
+/* ---- conversion charts ---------------------------------------------------- */
+function drawConvert(){
+  AC.bar(document.getElementById("convert-chart"), {h:210, min:60, max:100, ticks:4, vfmt:v=>v.toFixed(0)+"%", valueLabels:false,
+    groups:{ categories:STEPS.map(s=>s.k),
+      series:[
+        {name:"baseline", color:"var(--c7)", values:STEPS.map(s=>+(s.base*100).toFixed(0))},
+        {name:"after conversion", color:"var(--ac-blue)", values:STEPS.map(s=>+((s.det?1.0:s.base)*100).toFixed(0))}
+      ]}});
+  AC.bar(document.getElementById("gain-chart"), {h:210, ticks:4, vfmt:v=>v.toFixed(0)+"%", dp:0,
+    data:[
+      {label:"Baseline",   value:46, color:"var(--c7)"},
+      {label:"+ step 7",   value:53, color:"var(--c2)"},
+      {label:"+ step 8",   value:60, color:"var(--ok)"}
+    ]});
+}
+
+/* ---- render (registered with both hooks) --------------------------------- */
+function render(){ drawCompound(); drawPerStep(); drawConvert(); }
+
+/* ---- wire controls -------------------------------------------------------- */
+document.getElementById("p-slider").addEventListener("input", e=>{ P = +e.target.value/100; drawCompound(); });
+document.getElementById("n-slider").addEventListener("input", e=>{ N = +e.target.value; drawCompound(); });
+document.getElementById("deterministic-toggle").addEventListener("change", e=>{ deterministic = e.target.checked; drawPerStep(); });
+
+const gs = document.getElementById("gate-status");
+document.getElementById("gate-approve").addEventListener("click", ()=>{
+  gs.style.display="block"; gs.className="callout ok";
+  gs.innerHTML='<div class="k">Approved · 18 s</div><p style="margin:.2rem 0 0">reserve() fired once, idempotency key WO-4471-2906. 2 × kit held at Antwerp DC. Action logged; report written to the system of record.</p>';
+});
+document.getElementById("gate-reject").addEventListener("click", ()=>{
+  gs.style.display="block"; gs.className="callout bad";
+  gs.innerHTML='<div class="k">Rejected · no side effect</div><p style="margin:.2rem 0 0">reserve() was never called. Nothing reserved, nothing spent — the irreversible action stayed behind the gate.</p>';
+});
+
+AC.renderAll(render);
+AC.onThemeChange(render);
+</script>
+</body>
+</html>
