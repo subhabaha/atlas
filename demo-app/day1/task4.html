@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Production Readiness Review · Day 1 Task 4</title>
+<meta name="description" content="Reference demo: proving a change helped. Pre-registration, McNemar's paired test, power, the peeking simulator, calibration and drift, ending in a defensible ship decision.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../index.html"><span class="logo">AC</span><span>Advanced AI Engineering<small>Demo Gallery</small></span></a>
+    <span class="spacer"></span>
+    <nav>
+      <a href="../index.html">◂ All demos</a>
+      <a href="../day2/task1.html">Next: Day 2 ▸</a>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">☾</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div class="crumbs"><a href="../index.html">Gallery</a> › Day 1 · Accuracy Engineering › Task 4</div>
+    <div class="tags">
+      <span class="badge b-blue">Day 1 · Task 4</span>
+      <span class="badge">Day 1 assignment · scored</span>
+      <span class="badge tag-mods">MODULE 2B · MCNEMAR · POWER · PEEKING · CALIBRATION · DRIFT</span>
+    </div>
+    <h1>Production Readiness Review</h1>
+    <p class="tagline">You made <strong>exactly one change</strong> overnight and called it System B. Now do the thing almost no proof
+      of concept does: prove, properly, whether B is better — paired test, power, calibration, drift — and produce a review a release
+      board could sign.</p>
+  </div>
+
+  <!-- ---------------------------------------------------------- scenario -->
+  <section class="section" data-reveal>
+    <h2>The scenario</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <p>System A is the Task 2 model — a gradient-boosted tree on the raw AI4I sensor columns. Overnight you made <b>one</b> change:
+           you added the three derived physics features. That is System B. The question is not "is B nice" — it is
+           <strong>"is B better, and can we prove it to a board?"</strong></p>
+        <p style="margin-bottom:0">This task delivers all seven items on the Day 1 assignment slide, ending in a single verdict and the
+           strongest argument against that verdict.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:.6rem">Evaluation set <span class="note-sim">(held out, versioned)</span></h3>
+        <dl class="kv">
+          <dt>Items</dt><dd>3,000 machines scored</dd>
+          <dt>Positives</dt><dd>102 genuine failures</dd>
+          <dt>Change</dt><dd>+3 derived features (A → B)</dd>
+          <dt>Primary</dt><dd>recall @ FPR ≤ 2.3%</dd>
+          <dt>Design</dt><dd>paired — same items, both systems</dd>
+          <dt>Ordering</dt><dd>tool-wear band (for drift split)</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- what to build -->
+  <section class="section" data-reveal>
+    <h2>What the attendees must build</h2>
+    <ul class="checklist grid-2 grid">
+      <li>A committed <b>PREREGISTRATION</b> — primary metric, numeric pass criterion, test, abandon condition, timestamp</li>
+      <li>McNemar's 2×2 of per-item outcomes, reporting the discordant counts b and c</li>
+      <li>A permutation test (10,000 shuffles) and a paired bootstrap 95% interval on the difference</li>
+      <li>Effect size absolute-first, then relative, plus "machines scored per one extra failure caught"</li>
+      <li>McNemar power: discordant pairs needed for 5 / 10 / 20-point improvements</li>
+      <li>The peeking simulator — false-positive rate vs checking frequency, with the fix stated</li>
+      <li>A reliability curve with Brier score, and a PSI/KS drift table with a numeric retraining trigger</li>
+      <li>One verdict — SHIP / SHIP WITH LIMITS / DO NOT SHIP — and the strongest counter-argument against it</li>
+    </ul>
+  </section>
+
+  <!-- ---------------------------------------------------------- THE CONSOLE -->
+  <section class="section" data-reveal>
+    <h2>The live readiness console</h2>
+
+    <!-- preregistration -->
+    <div class="card" style="border-color:color-mix(in srgb,var(--ac-blue) 34%,var(--border));margin-bottom:1.1rem">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">PREREGISTRATION.md <span class="badge b-info" style="margin-left:.4rem">committed before any result</span></div>
+          <div class="chart-sub">Everything below is evaluated against this file. A team that quietly changes the primary metric later
+            is found out by its own git history — which is exactly how it should work.</div>
+        </div>
+        <div class="chip mono">commit a3f19c2 · 2026-08-18 21:14:03 UTC</div>
+      </div>
+      <div class="grid grid-4 keep2" style="margin-top:.4rem">
+        <div class="metric"><div class="label">Primary metric</div><div class="value sm">recall @ FPR ≤ 2.3%</div><div class="sub">the budget operating point from Task 2</div></div>
+        <div class="metric"><div class="label">Pass criterion</div><div class="value sm">Δrecall ≥ +0.10</div><div class="sub">and paired 95% CI excludes 0</div></div>
+        <div class="metric"><div class="label">Test</div><div class="value sm">McNemar + bootstrap</div><div class="sub">paired, on identical items</div></div>
+        <div class="metric accent-bad"><div class="label">Abandon if</div><div class="value sm">CI contains 0</div><div class="sub">or late-window recall &lt; baseline − 1 CI width</div></div>
+      </div>
+    </div>
+
+    <!-- the comparison -->
+    <div class="card">
+      <div class="chart-title">The comparison — paired, because item difficulty must cancel</div>
+      <div class="chart-sub">An unpaired two-sample test on the same evaluation set is the most common statistical error in AI work.
+        Items differ in difficulty; unpaired comparison treats that variation as noise, and the noise is usually larger than the
+        improvement. Pair, and item difficulty cancels. Below: per-item outcomes on the 102 failures.</div>
+      <div class="grid grid-2" style="margin-top:.7rem">
+        <div>
+          <div class="chart-sub">McNemar 2×2 · did each system catch the failure? (discordant cells highlighted)</div>
+          <div id="mcnemar-chart"></div>
+          <p class="small" style="margin:.5rem 0 0">Discordant counts: <b>b = 18</b> (A missed, B caught) · <b>c = 6</b> (A caught, B
+            missed). B disagrees with A in B's favour 3:1. Concordant cells carry no information about the difference.</p>
+        </div>
+        <div>
+          <div class="grid grid-2 keep2">
+            <div class="metric accent-ok"><div class="label">Absolute Δ recall</div><div class="value sm">+0.118</div><div class="ci">0.60 → 0.72</div></div>
+            <div class="metric"><div class="label">Relative Δ</div><div class="value sm">+19.6%</div><div class="sub">quoted only beside the absolute</div></div>
+            <div class="metric"><div class="label">Machines / extra catch</div><div class="value sm">≈ 250</div><div class="sub">the number a service manager uses</div></div>
+            <div class="metric"><div class="label">Permutation p</div><div class="value sm">0.024</div><div class="sub">10,000 shuffles · assumes nothing</div></div>
+          </div>
+          <div class="metric accent-warn" style="margin-top:1.1rem">
+            <div class="label">Paired bootstrap 95% CI on Δ recall</div>
+            <div class="value sm">[ +0.02 , +0.21 ]</div>
+            <div class="ci">does <b>not</b> contain zero — but only just</div>
+          </div>
+          <p class="small" style="margin:.7rem 0 0">Two overlapping single-system intervals would not answer the question. The
+            <b>paired</b> interval does: resample the same rows once, score both models, take the difference, repeat. It clears zero,
+            so the change is real — with a lower bound of just +0.02.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- power -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="chart-title">Power — could this gold set have detected it at all?</div>
+      <div class="chart-sub">The familiar "n per group" table is for two <em>independent</em> groups — the wrong design. Part 1 told you to
+        pair. Under McNemar the power depends only on the <b>discordant pairs</b>: n_discordant ≈ (z<sub>α/2</sub>+z<sub>β</sub>)² / (p<sub>b</sub>−p<sub>c</sub>)² × (p<sub>b</sub>+p<sub>c</sub>).</div>
+      <div class="table-wrap" style="margin-top:.7rem">
+        <table class="data">
+          <thead><tr><th>Improvement to detect</th><th class="num">n per group (independent — wrong)</th><th class="num">n_discordant (McNemar — correct)</th><th>Note</th></tr></thead>
+          <tbody>
+            <tr><td>0.60 → 0.80 (20 points)</td><td class="num">≈ 90</td><td class="num">≈ 25</td><td class="muted">we have 24 discordant — just detectable</td></tr>
+            <tr><td>0.60 → 0.70 (10 points)</td><td class="num">≈ 360</td><td class="num">≈ 100</td><td class="muted">need ~4× our discordant pairs</td></tr>
+            <tr><td>0.60 → 0.65 (5 points)</td><td class="num">≈ 1,500</td><td class="num">≈ 400</td><td class="muted">need ~17× — hopeless here</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn" style="margin-top:1rem">
+        <div class="k">The finding worth more than the comparison it invalidates</div>
+        <p style="margin:.3rem 0 0">Our evaluation set produced only <b>24 discordant pairs</b>. It can confirm a large, obvious win and
+          nothing subtler — our gold set is <b>an order of magnitude too small</b> to detect a 5-to-10-point improvement. Halving the
+          effect roughly quadruples the sample required.</p>
+      </div>
+    </div>
+
+    <!-- peeking -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">The peeking simulator — why "check until significant" is not a test</div>
+          <div class="chart-sub">Two <em>identical</em> systems. Evaluate after every few accumulated items and stop the moment
+            p &lt; 0.05. The nominal 5% false-positive rate climbs steeply — with frequent enough checking it passes 30%.</div>
+        </div>
+        <div class="control" style="min-width:260px">
+          <label>Check every <span class="readout" id="peek-read">10</span> items → FPR <span class="readout" id="peek-fpr">—</span></label>
+          <input type="range" id="peek" min="5" max="150" value="10" step="5">
+        </div>
+      </div>
+      <div id="peek-chart"></div>
+      <div class="callout bad" style="margin-top:1rem">
+        <div class="k">The fix, in one line</div>
+        <p style="margin:.3rem 0 0">Fix the sample size and the stopping rule <b>in advance</b>, or use a sequential design that accounts
+          for planned interim looks (alpha spending). The more often you peek at an undecided experiment, the more certain you are to
+          declare a winner that does not exist.</p>
+      </div>
+    </div>
+
+    <!-- calibration + drift -->
+    <div class="grid grid-2" style="margin-top:1.1rem">
+      <div class="card">
+        <div class="chart-title">Calibration — reliability curve, 10 bins</div>
+        <div class="chart-sub">Predicted probability against observed frequency. If the model says 0.8 and is right 55% of the time,
+          every threshold rule built on it behaves unexpectedly.</div>
+        <div id="calib-chart" style="margin-top:.4rem"></div>
+        <div class="grid grid-2 keep2" style="margin-top:.8rem">
+          <div class="metric accent-warn"><div class="label">Brier score</div><div class="value sm">0.087</div><div class="sub">lower is better · slightly overconfident</div></div>
+          <div class="metric"><div class="label">Deviation</div><div class="value sm">above the line</div><div class="sub">predicts higher than it delivers at the top bins</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chart-title">Drift — PSI / KS per top-five feature</div>
+        <div class="chart-sub">Early vs late window along the tool-wear ordering. Two features breach the PSI trigger.</div>
+        <div class="table-wrap" style="margin-top:.4rem">
+          <table class="data">
+            <thead><tr><th>Feature</th><th class="num">PSI</th><th class="num">KS</th><th class="num">p</th><th>Flag</th></tr></thead>
+            <tbody id="drift-body"></tbody>
+          </table>
+        </div>
+        <div class="callout" style="margin-top:.9rem">
+          <div class="k">Name the type · state the response</div>
+          <p style="margin:.3rem 0 .4rem"><b>Covariate shift</b> (feature distribution moves, P(y|x) holds) → recalibrate / retrain on
+            recent data. <b>Label shift</b> (class balance moves — Task 2's π change) → reweight thresholds, ranking still transfers.
+            <b>Concept drift</b> (P(y|x) itself moves) → the relationship changed; retrain, do not just recalibrate. Here the shift is
+            <b>covariate</b>: tool-wear and air-temp distributions moved late in the window.</p>
+        </div>
+        <div class="metric accent-bad">
+          <div class="label">Retraining trigger (numeric)</div>
+          <div class="value sm">PSI &gt; 0.25 on any top-five feature</div>
+          <div class="sub">or late-window recall drops more than one interval width below baseline</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- verdict -->
+    <div class="verdict v-warn" style="margin-top:1.1rem">
+      <span class="dot d-warn"></span>
+      <div>
+        <div class="vt">SHIP WITH LIMITS</div>
+        <div class="vs">The paired interval on Δrecall is [+0.02, +0.21] — it clears zero and meets the pre-registered +0.10 target,
+          so B is genuinely better. Ship B behind the €35 desk-triage operating point, with the PSI &gt; 0.25 retraining trigger armed
+          <b>on day one</b>. <b>Strongest counter-argument against my own verdict:</b> the interval's lower bound is only +0.02 on just 24
+          discordant pairs, and two top-five features already breach the PSI trigger — the measured gain may not survive the covariate
+          drift that is present <em>today</em>, and a gold set an order of magnitude larger could shrink it toward zero.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- the trap -->
+  <section class="section" data-reveal>
+    <h2>The traps this review exposes</h2>
+    <div class="callout bad">
+      <div class="k">Unpaired testing on the same evaluation set</div>
+      <p style="margin:.3rem 0 0">Comparing two systems with an independent two-sample test throws away the fact that they saw identical
+        items. Item difficulty becomes noise, and that noise is usually larger than the effect. Pair the outcomes and difficulty cancels —
+        McNemar looks only at the items where the systems disagree.</p>
+    </div>
+    <div class="callout warn">
+      <div class="k">Peeking until significant</div>
+      <p style="margin:.3rem 0 0">"Run it until p &lt; 0.05" is not a test; it is a way to manufacture a winner from two identical systems.
+        The false-positive rate climbs past 30% with frequent checking. Fix n and the stopping rule before you start, or spend alpha on
+        planned looks.</p>
+    </div>
+    <div class="callout">
+      <div class="k">A review that only argues for itself</div>
+      <p style="margin:.3rem 0 0">A readiness report signed by people who had no way to know what was omitted is advocacy, not evidence.
+        Requiring the strongest counter-argument in the same document is the cheapest defence against the failure mode that ends most
+        proofs of concept. If the facts cannot produce a real counter-argument, you did not measure enough.</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- lesson -->
+  <section class="section" data-reveal>
+    <div class="lesson">
+      <div class="k">The lesson this build makes undeniable</div>
+      <h3>Proving a change helped is a design, committed before the result.</h3>
+      <p style="margin-bottom:0">Pre-register the metric and the pass criterion. Pair the comparison so difficulty cancels. Check whether
+        your sample could ever detect the effect. Never peek. Calibrate and watch for drift. Then state one verdict — and the strongest
+        argument against it — because a well-defended DO NOT SHIP outscores a poorly-evidenced SHIP.</p>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="chart-title">Defend your result</div>
+      <p style="margin:.5rem 0 0;font-style:italic;color:var(--ink)">"System B raises recall from <b>0.60 to 0.72</b>, absolute
+        <b>+0.118</b>, paired 95% CI <b>[+0.02, +0.21]</b>, permutation p <b>0.024</b> — one extra failure caught per <b>250</b> machines
+        scored. It meets our pre-registered <b>+0.10</b> criterion, so we <b>SHIP WITH LIMITS</b>. What would have made us decide the other
+        way: a lower bound at zero, which is one order-of-magnitude-larger gold set away, and the two features already past PSI 0.25."</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- pagenav -->
+  <nav class="pagenav">
+    <a href="task3.html"><div class="pn"><small>◂ Prev · Day 1 · Task 3</small><b>Failure Taxonomy &amp; Hypothesis Backlog Console</b></div></a>
+    <a href="../day2/task1.html"><div class="pn next"><small>Next ▸ Day 2</small><b>Architecture &amp; Systems Engineering</b></div></a>
+  </nav>
+
+  <p class="note-sim" style="margin-top:2rem">All figures on this page are generated in your browser from a seeded simulator of a
+    paired A/B evaluation. The peeking curve is simulated live. No backend, no external calls. Cost figures are the illustrative placeholders from the task pack.</p>
+
+</main>
+
+<footer class="footer"><div class="footer-inner"><div>Atlas Copco · Advanced AI Engineering Bootcamp — Reference Demo Gallery</div><div class="small">Day 1 · Task 4</div></div></footer>
+
+<script src="../assets/charts.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+/* ---- McNemar 2x2 on the 102 failure items -------------------------------- */
+/* rows: A caught / A missed ; cols: B caught / B missed */
+const N11=55, C_=6, B_=18, N00=23;   // b=18 (A miss,B catch), c=6 (A catch,B miss)
+function mcnemarChart(){
+  // matrix layout [ [A catch & B catch, A catch & B miss(c)], [A miss & B catch(b), A miss & B miss] ]
+  const M=[[N11, C_],[B_, N00]];
+  AC.heatmap(document.getElementById("mcnemar-chart"), {
+    matrix:M, rows:["A caught","A missed"], cols:["B caught","B missed"],
+    cell:92, lblL:88, lblT:30, fmt:v=>v,
+    cellColor:(v,r,c,max)=>{
+      const discordant = (r===0&&c===1)||(r===1&&c===0);
+      const base = discordant ? AC.cssVar("--warn") : AC.cssVar("--ac-blue");
+      return AC.mix(AC.cssVar("--surface-2"), base, Math.pow(v/max,.55));
+    }
+  });
+}
+
+/* ---- reliability curve (10 bins, slightly overconfident) ----------------- */
+function calibChart(){
+  const pts=[], diag=[[0,0],[1,1]];
+  for(let b=0;b<10;b++){
+    const pred=(b+0.5)/10;
+    // overconfident: observed pulled toward 0.5 at the extremes
+    const obs = pred - (pred-0.5)*0.22;
+    pts.push([pred, Math.max(0,Math.min(1,obs))]);
+  }
+  AC.line(document.getElementById("calib-chart"), {
+    h:250, xmin:0, xmax:1, ymin:0, ymax:1, legend:false,
+    xticks:[{v:0,label:"0"},{v:.25,label:".25"},{v:.5,label:".5"},{v:.75,label:".75"},{v:1,label:"1"}],
+    xlabel:"Predicted probability", yfmt:v=>v.toFixed(1),
+    series:[
+      {name:"perfect", color:"var(--ink-3)", points:diag, dashed:true, width:1.4},
+      {name:"observed", color:"var(--ac-blue)", points:pts, dots:true, dotR:3, width:2.2}
+    ]
+  });
+}
+
+/* ---- drift table --------------------------------------------------------- */
+const DRIFT=[
+  {f:"Tool wear [min]",       psi:0.31, ks:0.19, p:"<0.001", flag:"bad",  note:"covariate · TRIGGER"},
+  {f:"Air temperature [K]",   psi:0.27, ks:0.15, p:"0.002",  flag:"bad",  note:"covariate · TRIGGER"},
+  {f:"Rotational speed [rpm]",psi:0.14, ks:0.09, p:"0.041",  flag:"warn", note:"mild covariate"},
+  {f:"Process temp [K]",      psi:0.11, ks:0.07, p:"0.121",  flag:"ok",   note:"stable"},
+  {f:"Torque [Nm]",           psi:0.08, ks:0.06, p:"0.213",  flag:"ok",   note:"stable"}
+];
+function driftTable(){
+  document.getElementById("drift-body").innerHTML = DRIFT.map(d=>{
+    const cls = d.flag==="bad"?"b-bad":d.flag==="warn"?"b-warn":"b-ok";
+    return `<tr><td>${d.f}</td><td class="num"><b>${d.psi.toFixed(2)}</b></td><td class="num">${d.ks.toFixed(2)}</td>`+
+           `<td class="num">${d.p}</td><td><span class="badge ${cls}">${d.note}</span></td></tr>`;
+  }).join("");
+}
+
+/* ---- peeking simulator --------------------------------------------------- */
+function peekFPR(interval, Nmax, trials){
+  Nmax = Nmax||300; trials = trials||360;
+  const rand = AC.rng(7000 + interval);
+  let fp=0;
+  for(let t=0;t<trials;t++){
+    let s=0, declared=false;
+    for(let i=1;i<=Nmax;i++){
+      s += AC.gauss(rand);
+      if(i%interval===0){ const z=s/Math.sqrt(i); if(Math.abs(z)>1.96){ declared=true; break; } }
+    }
+    if(declared) fp++;
+  }
+  return fp/trials;
+}
+let PEEK_CURVE=null;
+function peekChart(){
+  if(!PEEK_CURVE){
+    PEEK_CURVE=[];
+    for(let iv=150; iv>=5; iv-=5){ const looks=Math.floor(300/iv); PEEK_CURVE.push([looks, peekFPR(iv)*100]); }
+    PEEK_CURVE.sort((a,b)=>a[0]-b[0]);
+  }
+  AC.line(document.getElementById("peek-chart"), {
+    h:260, xmin:1, xmax:60, ymin:0, ymax:40, legend:false,
+    xticks:[{v:1,label:"1"},{v:10,label:"10"},{v:20,label:"20"},{v:30,label:"30"},{v:60,label:"60"}],
+    xlabel:"Number of looks at the data (checks per run)", yfmt:v=>v.toFixed(0)+"%",
+    series:[{name:"observed FPR", color:"var(--bad)", points:PEEK_CURVE, width:2.4, area:true, fillOpacity:.10, dots:true, dotR:2.4}],
+    hlines:[{y:5, color:"var(--ok)", label:"nominal 5%", dashed:true}]
+  });
+}
+function updatePeek(){
+  const iv = +document.getElementById("peek").value;
+  document.getElementById("peek-read").textContent = iv;
+  const fpr = peekFPR(iv);
+  document.getElementById("peek-fpr").textContent = (fpr*100).toFixed(0)+"%";
+}
+
+function render(){
+  mcnemarChart(); calibChart(); driftTable(); peekChart(); updatePeek();
+}
+document.getElementById("peek").addEventListener("input", updatePeek);
+AC.renderAll(render);
+AC.onThemeChange(render);
+</script>
+</body>
+</html>
