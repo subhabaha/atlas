@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pattern Selection Bench · Day 2 Task 1</title>
+<meta name="description" content="Reference demo: with four labelled failures you cannot evaluate a supervised model. Anomaly detection asks a question the compressor data can answer — and this bench proves it with a confidence interval whose width is the decision.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../index.html"><span class="logo">AC</span><span>Advanced AI Engineering<small>Demo Gallery</small></span></a>
+    <span class="spacer"></span>
+    <nav>
+      <a href="../index.html">◂ All demos</a>
+      <a href="task2.html">Next: The Nineteen Layers ▸</a>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">☾</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div class="crumbs"><a href="../index.html">Gallery</a> › Day 2 · Architecture, Data &amp; Security › Task 1</div>
+    <div class="tags">
+      <span class="badge b-blue">Day 2 · Task 1</span>
+      <span class="badge">Lab 1</span>
+      <span class="badge tag-mods">MODULE 1 · PATTERN SELECTION · GROUND TRUTH · ANOMALY DETECTION · GROUP LEAKAGE</span>
+    </div>
+    <h1>Pattern Selection Bench</h1>
+    <p class="tagline">With four labelled failures you cannot train a supervised model — and, more to the point, you cannot
+      <em>evaluate</em> one. Anomaly detection asks a question the data can answer. The confidence interval on recall is not a footnote;
+      its width <strong>is</strong> the architecture decision.</p>
+  </div>
+
+  <!-- ---------------------------------------------------------- scenario -->
+  <section class="section" data-reveal>
+    <h2>The scenario</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <p>Five industrial use cases are on the table; each has a tension in it. The team produces a defensible pattern decision for
+           all five, then settles <b>Case 2</b> empirically — the case where engineering instinct and the evidence point in opposite
+           directions.</p>
+        <p style="margin-bottom:0">Case 2 as written: vibration-based failure prediction on <b>300 compressors</b>, with <b>eleven
+           labelled failures in three years</b>. Almost every team's first answer is a supervised classifier. Today you build one and
+           discover that the problem is not that it performs badly — it is that <strong>you cannot tell whether it performs badly.</strong></p>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:.6rem">The data — a real compressor, real failures <span class="note-sim">(MetroPT-3, UCI 791)</span></h3>
+        <dl class="kv">
+          <dt>Asset</dt><dd>Air Production Unit — reciprocating compressor, metro train</dd>
+          <dt>Volume</dt><dd>1,516,948 readings @ 1 Hz · Feb–Aug 2020 · 208 MB</dd>
+          <dt>Analogue</dt><dd>TP2, TP3, H1, DV_pressure, Reservoirs, Motor_current, Oil_temp</dd>
+          <dt>Positives</dt><dd>4 air-leak failures: 18 Apr · 29–30 May · 5–7 Jun · 15 Jul</dd>
+          <dt>Normal window</dt><dd>Feb–Mar (documented) — the only fitting data allowed</dd>
+          <dt>Pre-step</dt><dd>Downsample to 1-min means — 1 Hz over-resolves an air leak</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- what to build -->
+  <section class="section" data-reveal>
+    <h2>What the attendees must build</h2>
+    <ul class="checklist grid-2 grid">
+      <li>Five ADRs — each naming three deciding criteria, one rejected alternative, and a <b>reversal cost</b></li>
+      <li>A supervised model with a <b>row-split</b> result and the honest <b>event-split</b> (leave-one-failure-out) beside it</li>
+      <li>The <b>group-leakage gap</b> explained in one sentence — near-duplicate readings on both sides of the split</li>
+      <li>A <b>bootstrap 95% CI on recall</b> over four events, with its width stated as the reason for the decision</li>
+      <li>Anomaly detectors fit on <b>February–March only</b>, never touching the four failure dates</li>
+      <li>Lead time reported for all four failures individually — including any the detector missed</li>
+      <li>Alert volume converted to <b>alerts / engineer / day</b> for a 300-compressor fleet</li>
+      <li>A decision panel taking the six selection questions as inputs and naming the pattern they imply</li>
+    </ul>
+  </section>
+
+  <!-- ---------------------------------------------------------- ADRs -->
+  <section class="section" data-reveal>
+    <h2>Five pattern decision records</h2>
+    <p class="small" style="margin-top:-.4rem">Module 1's six questions applied in order to each case. The decision is not prose — it is a
+      structured record with the field teams skip: <b>reversal cost</b>.</p>
+    <div class="grid grid-3" id="adr-grid"></div>
+  </section>
+
+  <!-- ---------------------------------------------------------- THE BENCH -->
+  <section class="section" data-reveal>
+    <h2>The live bench — Case 2, settled empirically</h2>
+
+    <div id="verdict" class="verdict v-warn" style="margin-bottom:1rem">
+      <span class="dot d-warn"></span>
+      <div>
+        <div class="vt">Supervised learning cannot be <em>evaluated</em> here — so it cannot be improved</div>
+        <div class="vs">Row-split ROC-AUC 0.991 is memorised, not learned. Recall over four events is 0.75 with a 95% interval of 0.30–0.95:
+          a good model and a poor one are indistinguishable. The pattern the data supports is anomaly detection.</div>
+      </div>
+    </div>
+
+    <!-- supervised comparison -->
+    <div class="card">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">Supervised model — the row split flatters, the event split tells the truth</div>
+          <div class="chart-sub">Label readings around each failure as positive; train a classifier. Split randomly by row (as tutorials do), then split by failure event (the only honest way — four folds, leave-one-out).</div>
+        </div>
+        <div class="control-row">
+          <div class="seg" id="split-seg">
+            <button class="active" data-mode="row">Row split (leaky)</button>
+            <button data-mode="event">Event split (honest)</button>
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-4 keep2" style="margin-bottom:1rem">
+        <div class="metric accent-blue"><div class="label">ROC-AUC</div><div class="value" id="m-auc">0.991</div><div class="sub" id="m-auc-sub">row split · looks excellent</div></div>
+        <div class="metric"><div class="label">Recall</div><div class="value sm" id="m-rec">0.98</div><div class="sub" id="m-rec-sub">near-perfect on held-out rows</div></div>
+        <div class="metric"><div class="label">Precision</div><div class="value sm" id="m-prec">0.97</div><div class="sub">of flagged windows</div></div>
+        <div class="metric"><div class="label">Fold spread</div><div class="value sm" id="m-spread">±0.01</div><div class="sub" id="m-spread-sub">across resamples</div></div>
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <div class="chart-sub" id="sup-left-title">Row-split metrics — every score above 0.97</div>
+          <div id="sup-metrics-chart"></div>
+        </div>
+        <div>
+          <div class="chart-sub">ROC-AUC per honest fold — train on three failures, test on the fourth</div>
+          <div id="sup-fold-chart"></div>
+        </div>
+      </div>
+      <div class="callout bad" style="margin-top:1rem">
+        <div class="k">The group-leakage gap, in one sentence</div>
+        <p style="margin:.3rem 0 0">Consecutive readings from the same compressor seconds apart are almost identical, so a random row split puts
+          near-duplicates on both sides — <strong>the test set is effectively part of the training set</strong>. The model memorised four episodes and is
+          congratulated for recognising them. Switch to the event split and the AUC collapses to a coin toss on the hardest fold.</p>
+      </div>
+    </div>
+
+    <!-- recall CI -->
+    <div class="grid grid-2" style="margin-top:1.1rem">
+      <div class="card">
+        <div class="chart-title">The measurement that actually settles the case</div>
+        <div class="chart-sub">Forget performance. With four positive events, how precisely could recall be measured <em>even if the model were perfect</em>? Bootstrap the CI over the events.</div>
+        <div class="grid grid-2" style="margin:.4rem 0 1rem">
+          <div class="metric accent-warn"><div class="label">Observed recall</div><div class="value">0.75</div><div class="ci">95% CI 0.30 – 0.95</div></div>
+          <div class="metric"><div class="label">Interval width</div><div class="value sm">0.65</div><div class="sub">this is the decision</div></div>
+        </div>
+        <div id="recall-ci-chart"></div>
+        <p class="small" style="margin:.7rem 0 0">Catching three of four events gives recall 0.75 — but the interval spans from
+          <b>0.30</b> to <b>0.95</b>. You cannot distinguish a good model from a poor one, cannot show an improvement, cannot fail a model that
+          deserves to fail. <b>An architecture you cannot evaluate is one you can never improve.</b></p>
+      </div>
+      <div class="card">
+        <div class="chart-title">Signal traces around the 15 July failure <span class="badge b-info" style="margin-left:.4rem">anomaly score overlaid</span></div>
+        <div class="chart-sub">Anomaly detector fit on Feb–Mar only. TP2 and the reservoir pressure deviate first; motor current lags — the explainability that gives an engineer something to act on.</div>
+        <div id="signal-chart"></div>
+        <div class="legend" id="signal-legend"></div>
+      </div>
+    </div>
+
+    <!-- lead time + alert calculator -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">The pattern the data can support — lead time and a defensible alert volume</div>
+          <div class="chart-sub">Two detectors, fit without a single labelled failure: a rolling control-limit detector (yesterday's chart) and an isolation forest. Lead time = hours before the documented failure the score first crossed and stayed crossed.</div>
+        </div>
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <div class="chart-sub">Detection lead time per failure — hours from first sustained alert to documented failure</div>
+          <div id="lead-chart"></div>
+          <p class="small" style="margin:.5rem 0 0">The 5–7 June event is <b>missed</b> on the control-limit detector (slow onset inside the reservoir band);
+            the isolation forest catches it at 9&nbsp;h. Reporting the miss is the deliverable, not hiding it.</p>
+        </div>
+        <div>
+          <div class="chart-sub">Alert-volume calculator — a 300-compressor fleet, three on-call engineers</div>
+          <div class="control" style="min-width:100%;margin:.3rem 0 .8rem">
+            <label for="thr">Detector threshold — false-positive rate per compressor-day <span class="readout" id="thr-read">3.5 σ</span></label>
+            <input type="range" id="thr" min="25" max="45" value="35" step="1">
+          </div>
+          <div class="grid grid-3 keep2">
+            <div class="metric accent-blue"><div class="label">Alerts / engineer / day</div><div class="value" id="a-eng">4.2</div><div class="sub" id="a-eng-sub">defensible triage load</div></div>
+            <div class="metric"><div class="label">Fleet alerts / day</div><div class="value sm" id="a-fleet">13</div><div class="sub">300 compressors</div></div>
+            <div class="metric"><div class="label">Mean lead time</div><div class="value sm" id="a-lead">27 h</div><div class="sub">at this threshold</div></div>
+          </div>
+          <p class="small" style="margin:.7rem 0 0">Tighten the threshold and alerts fall but lead time shrinks with them — a threshold you can <b>tune</b>,
+            which is exactly what four labelled failures never gave you.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- decision panel -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="chart-title">Decision panel — the six questions, executable rather than remembered</div>
+      <div class="chart-sub">Answer Module 1's sequence in order. The first two eliminate whole families; the panel names the pattern they imply.</div>
+      <div class="grid grid-3" style="margin-top:.8rem">
+        <div class="control"><label>1 · Data type</label><select id="q1"><option value="ts">Continuous telemetry (time series)</option><option>Text / documents</option><option>Tabular records</option></select></div>
+        <div class="control"><label>2 · Ground truth</label><select id="q2"><option value="scarce">Scarce — 4 labelled events</option><option value="rich">Rich, balanced labels</option><option value="none">None at all</option></select></div>
+        <div class="control"><label>3 · Latency budget</label><select id="q3"><option>Seconds (near real time)</option><option>Minutes</option><option>Hours / batch</option></select></div>
+        <div class="control"><label>4 · Act or recommend</label><select id="q4"><option>Recommend to an engineer</option><option>Act autonomously</option></select></div>
+        <div class="control"><label>5 · Who may see what</label><select id="q5"><option>One maintenance team</option><option>Role-restricted</option></select></div>
+        <div class="control"><label>6 · Integrate with</label><select id="q6"><option>CMMS work orders</option><option>Fleet dashboard only</option></select></div>
+      </div>
+      <div class="verdict v-ok" id="panel-verdict" style="margin-top:1rem">
+        <span class="dot d-ok"></span>
+        <div>
+          <div class="vt" id="panel-title">Implied pattern: Anomaly detection</div>
+          <div class="vs" id="panel-sub">Scarce ground truth eliminates supervised classification at question 2; continuous telemetry and an engineer-in-the-loop confirm an unsupervised, tunable detector with per-signal explainability.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- the trap -->
+  <section class="section" data-reveal>
+    <h2>The trap the confidence hides</h2>
+    <div class="callout bad">
+      <div class="k">An excellent, unmeasurable score</div>
+      <p style="margin:.3rem 0 0">Write the row-split scores on the dashboard and they will be applauded. But four failure episodes cannot be
+        split honestly — leave-one-out gives four folds, and one of them is a coin toss. The answer to Case 2 is not "supervised learning performs
+        worse". It is <strong>"supervised learning cannot be evaluated here."</strong></p>
+    </div>
+    <div class="callout warn">
+      <div class="k">Fitting that touches the failure dates</div>
+      <p style="margin:.3rem 0 0">If any normalisation, scaler or threshold is fit on data that includes April–August, the detector has seen the
+        answer. Fit on the documented Feb–March normal window only, then score everything after. Anything else leaks the very events you are trying to
+        detect ahead of time.</p>
+    </div>
+    <div class="callout">
+      <div class="k">A score without a signal name</div>
+      <p style="margin:.3rem 0 0">An anomaly detector that emits a number gives a maintenance engineer something to ignore. One that names the
+        deviating signal — <em>TP2 and reservoir pressure moved before motor current</em> — gives them an air leak to go and find. Explainability was one of
+        the twelve selection criteria; this is what it looks like in practice.</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- lesson -->
+  <section class="section" data-reveal>
+    <div class="lesson">
+      <div class="k">The lesson this build makes undeniable</div>
+      <h3>Ground-truth availability chooses the pattern before performance ever enters the room.</h3>
+      <p style="margin-bottom:0">Anomaly detection is not the fallback for when supervised learning is weak. It is the correct pattern when your
+        labels are too scarce to <b>measure</b> a supervised model at all. The confidence interval on recall is the whole argument: when it runs from
+        0.30 to 0.95, the question the case was really asking was never "which model?" — it was "which pattern can this data support?"</p>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="chart-title">Defend your result</div>
+      <p style="margin:.5rem 0 0;font-style:italic;color:var(--ink)">“For Case 2 we chose <b>anomaly detection</b> because with four labelled events the
+        interval on recall runs from <b>0.30 to 0.95</b> — we could never have measured a supervised model. Our detector gives a mean <b>27 hours</b> of lead
+        time at <b>4.2 alerts per engineer per day</b> across 300 compressors, on a threshold we can tune. The biggest risk is a slow-onset leak inside the
+        reservoir band, which is why we run two detectors and report the one miss.”</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- pagenav -->
+  <nav class="pagenav">
+    <a href="../day1/task4.html"><div class="pn"><small>◂ Day 1 · Task 4</small><b>Previous demo</b></div></a>
+    <a href="task2.html"><div class="pn next"><small>Next ▸ Day 2 · Task 2</small><b>The Nineteen Layers</b></div></a>
+  </nav>
+
+  <p class="note-sim" style="margin-top:2rem">All figures on this page are generated in your browser from a seeded simulator matching the MetroPT-3 task specification. No backend, no external calls. Metric values are illustrative placeholders consistent with the task pack.</p>
+
+</main>
+
+<footer class="footer"><div class="footer-inner"><div>Atlas Copco · Advanced AI Engineering Bootcamp — Reference Demo Gallery</div><div class="small">Day 2 · Task 1</div></div></footer>
+
+<script src="../assets/charts.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+/* ---------- Five ADRs ---------------------------------------------------- */
+const ADRS = [
+  { case:"Case 1 · Fleet energy optimisation", pat:"Forecasting + optimisation", tone:"b-blue",
+    crit:["Latency budget (minute-level)","Ground truth (metered kWh, abundant)","Act-vs-recommend (advisory)"],
+    rej:"Reinforcement learning — ruled out by <b>reversal cost</b>: an online policy is hard to roll back safely.",
+    rev:"Low — swap the objective and re-fit on the same metered history in an afternoon." },
+  { case:"Case 2 · Vibration failure prediction", pat:"Anomaly detection", tone:"b-warn",
+    crit:["Ground-truth availability (4 events)","Data type (continuous telemetry)","Explainability (name the signal)"],
+    rej:"Supervised classifier — ruled out by <b>evaluability</b>: recall CI 0.30–0.95 over four events.",
+    rev:"High — a supervised commitment would need years of labelled failures to unwind. Chosen precisely to keep reversal cheap." },
+  { case:"Case 3 · Service knowledge copilot", pat:"Retrieval-augmented generation", tone:"b-info",
+    crit:["Data type (documents)","Who-may-see (role-restricted)","Integration (manuals + CMMS)"],
+    rej:"Fine-tuned LLM — ruled out by <b>access control</b>: baked-in knowledge cannot be filtered per role.",
+    rev:"Low — re-chunk and re-index; the corpus is the asset, not the weights." },
+  { case:"Case 4 · Parts-order classification", pat:"Supervised classification", tone:"b-ok",
+    crit:["Ground truth (rich, historical)","Latency (per-request)","Throughput (steady volume)"],
+    rej:"Rules engine — ruled out by <b>maintainability</b>: hundreds of SKUs drift faster than rules can be edited.",
+    rev:"Medium — labels exist, so re-training is cheap; the integration contract is the sticky part." },
+  { case:"Case 5 · Demand forecasting", pat:"Time-series forecasting", tone:"b-blue",
+    crit:["Data type (regular series)","Horizon (weeks ahead)","Act-vs-recommend (planning input)"],
+    rej:"Anomaly detection — ruled out by <b>question mismatch</b>: the need is a level, not an outlier flag.",
+    rev:"Low — models are re-fit on a schedule already; changing family is routine." }
+];
+document.getElementById("adr-grid").innerHTML = ADRS.map(a=>`
+  <div class="card">
+    <div class="tags" style="margin-bottom:.5rem"><span class="badge ${a.tone}">${a.pat}</span></div>
+    <h3 style="font-size:1rem;margin-bottom:.5rem">${a.case}</h3>
+    <div class="small" style="text-transform:uppercase;letter-spacing:.03em;color:var(--ink-3);font-weight:700;margin-bottom:.2rem">Three deciding criteria</div>
+    <ul class="checklist" style="margin-bottom:.6rem">${a.crit.map(c=>`<li>${c}</li>`).join("")}</ul>
+    <div class="small" style="text-transform:uppercase;letter-spacing:.03em;color:var(--ink-3);font-weight:700;margin-bottom:.15rem">Rejected alternative</div>
+    <p class="small" style="margin:0 0 .6rem">${a.rej}</p>
+    <div class="callout" style="margin:0;padding:.6rem .8rem;background:var(--surface-2)"><div class="k">Reversal cost</div><p style="margin:.2rem 0 0" class="small">${a.rev}</p></div>
+  </div>`).join("");
+
+/* ---------- Bench state + charts ---------------------------------------- */
+let splitMode = "row";
+
+const ROW = { auc:0.991, recall:0.98, precision:0.97, accuracy:0.99, spread:"±0.01" };
+const FOLDS = [ // leave-one-failure-out AUCs — wildly variable
+  {label:"18 Apr", auc:0.94}, {label:"29–30 May", auc:0.55},
+  {label:"5–7 Jun", auc:0.71}, {label:"15 Jul", auc:0.38}
+];
+const EVENT_MEAN = FOLDS.reduce((a,f)=>a+f.auc,0)/FOLDS.length;
+
+function drawSupervised(){
+  // metric tiles
+  if(splitMode==="row"){
+    document.getElementById("m-auc").textContent="0.991";
+    document.getElementById("m-auc-sub").textContent="row split · looks excellent";
+    document.getElementById("m-rec").textContent="0.98";
+    document.getElementById("m-rec-sub").textContent="near-perfect on held-out rows";
+    document.getElementById("m-prec").textContent="0.97";
+    document.getElementById("m-spread").textContent="±0.01";
+    document.getElementById("m-spread-sub").textContent="across resamples";
+    document.getElementById("sup-left-title").textContent="Row-split metrics — every score above 0.97";
+    document.getElementById("verdict").className="verdict v-warn";
+  } else {
+    document.getElementById("m-auc").textContent=EVENT_MEAN.toFixed(2);
+    document.getElementById("m-auc-sub").textContent="event split · mean of 4 folds";
+    document.getElementById("m-rec").textContent="0.75";
+    document.getElementById("m-rec-sub").textContent="3 of 4 events caught";
+    document.getElementById("m-prec").textContent="0.42";
+    document.getElementById("m-spread").textContent="±0.24";
+    document.getElementById("m-spread-sub").textContent="fold-to-fold — enormous";
+    document.getElementById("sup-left-title").textContent="Event-split metrics — the same model, honestly measured";
+  }
+  const metricData = splitMode==="row"
+    ? [{label:"Accuracy",value:0.99},{label:"Precision",value:0.97},{label:"Recall",value:0.98},{label:"ROC-AUC",value:0.991}]
+    : [{label:"Accuracy",value:0.68},{label:"Precision",value:0.42},{label:"Recall",value:0.75},{label:"ROC-AUC",value:EVENT_MEAN}];
+  AC.bar(document.getElementById("sup-metrics-chart"), { h:190, min:0, max:1, ticks:4, dp:2,
+    data: metricData.map(d=>({label:d.label, value:d.value, color: d.value>=0.85?"var(--c1)": d.value>=0.6?"var(--c3)":"var(--c6)"})) });
+  AC.bar(document.getElementById("sup-fold-chart"), { h:190, min:0, max:1, ticks:4, dp:2,
+    data: FOLDS.map(f=>({label:f.label, value:f.auc, color: f.auc>=0.85?"var(--c1)": f.auc>=0.6?"var(--c3)":"var(--c6)"})),
+    hlines:[{y:0.5}] });
+  // guide line at 0.5 chance (bar has no hlines, so overlay by note) — handled in metricData colors
+}
+
+function drawRecallCI(){
+  // interval plot: recall on x (0..1), single row at y=1; band from 0.30 to 0.95, point 0.75
+  const lo=0.30, hi=0.95, pt=0.75;
+  AC.line(document.getElementById("recall-ci-chart"), {
+    h:130, xmin:0, xmax:1, ymin:0, ymax:2, legend:false,
+    xticks:[{v:0,label:"0.0"},{v:0.25,label:"0.25"},{v:0.5,label:"0.5"},{v:0.75,label:"0.75"},{v:1,label:"1.0"}],
+    yticks:1, yfmt:()=>"", xlabel:"Recall over four failure events",
+    series:[{name:"95% CI", color:"var(--c3)", width:10, points:[[lo,1],[hi,1]]}],
+    markers:[
+      {x:pt,y:1,color:"var(--ac-blue)",r:7,shape:"circle",label:"0.75"},
+      {x:lo,y:1,color:"var(--c3)",r:3.5,shape:"diamond"},
+      {x:hi,y:1,color:"var(--c3)",r:3.5,shape:"diamond"}
+    ],
+    vlines:[{x:lo,color:"var(--ink-3)",label:"0.30",dashed:true},{x:hi,color:"var(--ink-3)",label:"0.95",dashed:true}]
+  });
+}
+
+function drawSignals(){
+  const rand = AC.rng(791);
+  const N=120; // minutes around failure; failure window ~ [90,105]
+  const tp2=[], res=[], cur=[], score=[];
+  for(let i=0;i<N;i++){
+    const t=i;
+    // baseline + drift beginning ~ minute 78 for TP2/reservoir, later for current
+    const leakTp2  = i>78 ? (i-78)*0.9 : 0;
+    const leakRes  = i>82 ? (i-82)*0.7 : 0;
+    const leakCur  = i>96 ? (i-96)*1.1 : 0;
+    tp2.push([t, 6.4 + AC.gauss(rand)*0.12 - leakTp2*0.05]);
+    res.push([t, 8.2 + AC.gauss(rand)*0.10 - leakRes*0.04]);
+    cur.push([t, 3.9 + AC.gauss(rand)*0.10 + leakCur*0.03]);
+    const s = Math.min(1, 0.06 + Math.abs(AC.gauss(rand))*0.03 + Math.max(0,leakTp2)*0.03 + Math.max(0,leakRes)*0.025 + Math.max(0,leakCur)*0.02);
+    score.push([t, s]);
+  }
+  // scale signals into a shared 0..1 band by simple normalisation for display
+  const norm=(arr)=>{const ys=arr.map(p=>p[1]);const mn=Math.min(...ys),mx=Math.max(...ys);return arr.map(p=>[p[0],(p[1]-mn)/((mx-mn)||1)]);};
+  AC.line(document.getElementById("signal-chart"), {
+    h:260, xmin:0, xmax:N-1, ymin:0, ymax:1.05, legend:false,
+    xticks:[{v:0,label:"−90m"},{v:30,label:"−60m"},{v:60,label:"−30m"},{v:90,label:"−0"},{v:119,label:"+30m"}],
+    xlabel:"Minutes relative to documented failure", yfmt:v=>v.toFixed(1),
+    series:[
+      {name:"TP2 pressure", color:"var(--c1)", points:norm(tp2), width:1.8},
+      {name:"Reservoir pressure", color:"var(--c2)", points:norm(res), width:1.8},
+      {name:"Motor current", color:"var(--c4)", points:norm(cur), width:1.8},
+      {name:"Anomaly score", color:"var(--c6)", points:score, width:2.4, dashed:true}
+    ],
+    hlines:[{y:0.5,color:"var(--c6)",label:"alert threshold"}],
+    vbands:[{x0:90,x1:105,color:"var(--bad)",label:"failure window",opacity:0.12}]
+  });
+  document.getElementById("signal-legend").innerHTML =
+    '<span class="li"><span class="sw" style="background:var(--c1)"></span>TP2 (deviates first)</span>'+
+    '<span class="li"><span class="sw" style="background:var(--c2)"></span>reservoir pressure</span>'+
+    '<span class="li"><span class="sw" style="background:var(--c4)"></span>motor current (lags)</span>'+
+    '<span class="li"><span class="sw" style="background:var(--c6)"></span>anomaly score</span>';
+}
+
+const LEAD = [ // hours of lead time; 5-7 Jun missed on control-limit
+  {label:"18 Apr", value:31, color:"var(--c5)"},
+  {label:"29–30 May", value:41, color:"var(--c5)"},
+  {label:"5–7 Jun", value:9, color:"var(--c3)"},
+  {label:"15 Jul", value:26, color:"var(--c5)"}
+];
+function drawLead(){
+  AC.bar(document.getElementById("lead-chart"), { h:200, min:0, max:48, ticks:4, dp:0, vfmt:v=>v+"h",
+    data: LEAD });
+}
+
+/* alert calculator */
+function alertCalc(){
+  const s = +document.getElementById("thr").value/10; // 2.5..4.5 sigma
+  document.getElementById("thr-read").textContent = s.toFixed(1)+" σ";
+  // false positives per compressor-day fall sharply with sigma; lead time falls too
+  const fprDay = Math.max(0.005, 0.62*Math.exp(-1.35*(s-2.5))); // per compressor per day
+  const fleet = Math.round(fprDay*300);
+  const perEng = fleet/3;
+  const lead = Math.round(46 - (s-2.5)*9.5); // higher threshold -> less lead
+  document.getElementById("a-fleet").textContent = fleet;
+  document.getElementById("a-eng").textContent = perEng.toFixed(1);
+  document.getElementById("a-lead").textContent = Math.max(6,lead)+" h";
+}
+document.getElementById("thr").addEventListener("input", alertCalc);
+
+/* decision panel */
+function resolvePanel(){
+  const gt = document.getElementById("q2").value;
+  const dt = document.getElementById("q1").value;
+  const t = document.getElementById("panel-title"), s = document.getElementById("panel-sub");
+  const v = document.getElementById("panel-verdict");
+  if(gt==="scarce" && dt==="ts"){
+    v.className="verdict v-ok"; t.textContent="Implied pattern: Anomaly detection";
+    s.textContent="Scarce ground truth eliminates supervised classification at question 2; continuous telemetry and an engineer-in-the-loop confirm an unsupervised, tunable detector with per-signal explainability.";
+  } else if(gt==="rich" && dt==="ts"){
+    v.className="verdict v-warn"; t.textContent="Implied pattern: Supervised classification / forecasting";
+    s.textContent="Rich labels re-open supervised families — but validate the split by event, not by row, before trusting any score on telemetry.";
+  } else if(dt==="Text / documents"){
+    v.className="verdict v-warn"; t.textContent="Implied pattern: Retrieval-augmented generation";
+    s.textContent="Documents plus a who-may-see-what constraint point to retrieval with access control inside the query — see Task 4.";
+  } else if(gt==="none"){
+    v.className="verdict v-warn"; t.textContent="Implied pattern: Unsupervised / anomaly detection";
+    s.textContent="With no ground truth at all, only patterns that ask 'is this unusual?' are evaluable — supervised learning has nothing to be scored against.";
+  } else {
+    v.className="verdict v-warn"; t.textContent="Implied pattern: Supervised classification";
+    s.textContent="Tabular records with rich labels support a classifier — provided the reversal cost of its integration contract is acknowledged.";
+  }
+}
+["q1","q2","q3","q4","q5","q6"].forEach(id=>document.getElementById(id).addEventListener("change", resolvePanel));
+
+/* split toggle */
+document.querySelectorAll("#split-seg button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("#split-seg button").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active"); splitMode=b.dataset.mode; drawSupervised();
+}));
+
+function render(){
+  drawSupervised(); drawRecallCI(); drawSignals(); drawLead(); alertCalc(); resolvePanel();
+}
+AC.renderAll(render);
+AC.onThemeChange(render);
+</script>
+</body>
+</html>

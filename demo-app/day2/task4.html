@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secure Retrieval, Three Roles · Day 2 Task 4</title>
+<meta name="description" content="Reference demo: retrieve-then-filter is not access control — the restricted content already shaped the answer. Two designs side by side, per-role evaluation, the four leakage paths, and the one this room fails.">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  .cand { display:flex; align-items:center; gap:.6rem; padding:.5rem .7rem; border:1px solid var(--border); border-radius:8px; background:var(--surface-2); margin-bottom:.4rem; font-size:.86rem; }
+  .cand .cn { flex:1; }
+  .cand .cs { font-size:.72rem; text-transform:uppercase; letter-spacing:.03em; font-weight:700; padding:.15rem .5rem; border-radius:999px; }
+  .cs.candidate { background:var(--info-bg); color:var(--info); }
+  .cs.filtered { background:var(--warn-bg); color:var(--warn); }
+  .cs.never { background:var(--ok-bg); color:var(--ok); }
+  .cs.leaked { background:var(--bad-bg); color:var(--bad); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../index.html"><span class="logo">AC</span><span>Advanced AI Engineering<small>Demo Gallery</small></span></a>
+    <span class="spacer"></span>
+    <nav>
+      <a href="../index.html">◂ All demos</a>
+      <a href="../day3/task1.html">Next: Day 3 · Task 1 ▸</a>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">☾</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div class="crumbs"><a href="../index.html">Gallery</a> › Day 2 · Architecture, Data &amp; Security › Task 4</div>
+    <div class="tags">
+      <span class="badge b-blue">Day 2 · Task 4</span>
+      <span class="badge">Lab 4</span>
+      <span class="badge tag-mods">MODULE 4 · RBAC · ACCESS-FILTERED RETRIEVAL · PER-ROLE EVALUATION · LEAKAGE PATHS · RED-TEAM</span>
+    </div>
+    <h1>Secure Retrieval, Three Roles</h1>
+    <p class="tagline">Retrieve-then-filter is not access control. The restricted content already entered the model's context and
+      <strong>shaped the answer</strong> — the clean citations are a hope, not a control. Get this one wrong and every other control you built today
+      is decoration.</p>
+  </div>
+
+  <!-- scenario + roles -->
+  <section class="section" data-reveal>
+    <h2>The scenario &amp; the three roles</h2>
+    <div class="card">
+      <p>One corpus, three roles, and a rule that has to hold every time. The user's access rights must become part of the retrieval
+         query, so restricted documents are <b>never candidates</b> and cannot influence anything.</p>
+      <div class="table-wrap" style="margin-top:.6rem">
+        <table class="data">
+          <thead><tr><th>Role</th><th>May access</th><th>Must not access</th></tr></thead>
+          <tbody>
+            <tr><td><b>Service engineer</b></td><td>Maintenance procedures, troubleshooting guides, parts catalogues for certified families</td><td class="muted">Design documents, unreleased specs, commercial terms, other customers' records</td></tr>
+            <tr><td><b>Product engineer</b></td><td>Design documents, specifications, test reports, failure analyses</td><td class="muted">Customer-specific commercial data, personal data in service records</td></tr>
+            <tr><td><b>Customer support</b></td><td>Published documentation, warranty terms, the requesting customer's own service history</td><td class="muted">Internal engineering documents, other customers' data, cost and margin information</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- what to build -->
+  <section class="section" data-reveal>
+    <h2>What the attendees must build</h2>
+    <ul class="checklist grid-2 grid">
+      <li>Retrieve-then-filter and filter-then-retrieve both demonstrated, on the same leaking question</li>
+      <li>Access metadata on <b>every chunk</b> — not every document — and a filter predicate applied inside the search call</li>
+      <li>Identity propagation: the authenticated identity from Task 2 reaches the retrieval layer, not a service account</li>
+      <li>The empty path — “nothing available to you” handled gracefully as a correct answer</li>
+      <li>Six automated tests minimum, three of them <b>negative</b> (must return nothing)</li>
+      <li>Three role-scoped evaluation scores, reported separately</li>
+      <li>All four leakage paths checked, with the log and trace stores actually grepped</li>
+      <li>Red-team findings reported for the system you attacked and for your own</li>
+    </ul>
+  </section>
+
+  <!-- two designs interactive -->
+  <section class="section" data-reveal>
+    <h2>The live comparison — pick a role and a question</h2>
+    <div class="card">
+      <div class="dash-toolbar">
+        <div class="control-row">
+          <div class="control"><label>Role</label>
+            <select id="role"><option value="se">Service engineer</option><option value="pe">Product engineer</option><option value="cs">Customer support</option></select></div>
+          <div class="control" style="min-width:320px"><label>Question</label>
+            <select id="ques">
+              <option value="q1">Torque spec for the GA-75 element housing?</option>
+              <option value="q2" selected>Rotor clearance in the unreleased ZR-160 redesign?</option>
+              <option value="q3">Warranty terms for customer Meridian Logistics?</option>
+            </select></div>
+        </div>
+        <div class="seg" id="design-seg">
+          <button class="active" data-d="rtf">Retrieve-then-filter</button>
+          <button data-d="ftr">Filter-then-retrieve</button>
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <div>
+          <div class="chart-sub">Candidate set — what the retriever actually pulled before the model saw anything</div>
+          <div id="cand-list" style="margin-top:.5rem"></div>
+        </div>
+        <div>
+          <div class="chart-sub">Resulting answer</div>
+          <div id="answer-verdict" class="verdict" style="margin-top:.5rem"><span class="dot"></span><div><div class="vt" id="av-title"></div><div class="vs" id="av-sub"></div></div></div>
+          <div class="callout" id="answer-body" style="margin-top:.8rem;background:var(--surface-2)"><p class="small" id="ab-text" style="margin:0"></p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:1.1rem">
+      <div class="k">The librarian</div>
+      <p style="margin:.3rem 0 0">A librarian who fetches every book, reads them, summarises them and then tries not to mention the restricted ones has
+        <strong>already read the restricted ones to you, in aggregate.</strong> A librarian who only searches the shelves you are permitted to use has not. Only
+        the second is access control — and it is the difference between the two designs above.</p>
+    </div>
+  </section>
+
+  <!-- test cases + per-role eval -->
+  <section class="section" data-reveal>
+    <h2>Automated tests &amp; per-role evaluation</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="chart-title">Six test cases — the negative ones are what count</div>
+        <div class="chart-sub">Three that must return results, three that must return nothing. A system that never returns “nothing available to you” has probably not implemented access control at all.</div>
+        <div class="table-wrap" style="margin-top:.6rem">
+          <table class="data">
+            <thead><tr><th>Role</th><th>Query</th><th>Expected</th><th>Result</th></tr></thead>
+            <tbody id="test-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chart-title">Per-role evaluation — three scores, not one</div>
+        <div class="chart-sub">Run the 40-question gold set once as each role. A gold set measured as an administrator describes nobody; the difference between the three role-scoped scores is the honest picture of what each population receives.</div>
+        <div class="grid grid-3 keep2" style="margin:.6rem 0 1rem">
+          <div class="metric accent-blue"><div class="label">Service eng.</div><div class="value sm">0.78</div><div class="sub">31 / 40</div></div>
+          <div class="metric accent-blue"><div class="label">Product eng.</div><div class="value sm">0.85</div><div class="sub">34 / 40</div></div>
+          <div class="metric accent-blue"><div class="label">Cust. support</div><div class="value sm">0.62</div><div class="sub">25 / 40</div></div>
+        </div>
+        <div id="role-chart"></div>
+        <p class="small" style="margin:.6rem 0 0">Customer support scores lowest not because retrieval is worse but because their permitted corpus is smaller — which is
+          the correct, bounded experience, not a bug to tune away.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- leakage paths + red team -->
+  <section class="section" data-reveal>
+    <h2>The four leakage paths — and the one this room fails</h2>
+    <div class="card">
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Leakage path</th><th>How to check it in your own code</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Retrieval returns what the user may not see</td><td class="muted">Assert on candidate sets, not only on citations</td><td><span class="badge b-ok">closed · filter-then-retrieve</span></td></tr>
+            <tr><td>Model repeats sensitive content from context</td><td class="muted">Mask at ingestion, where the value is never needed</td><td><span class="badge b-ok">closed · masked at ingest</span></td></tr>
+            <tr><td>Tool calls send internal data to an external service</td><td class="muted">List every outbound call and its payload</td><td><span class="badge b-warn">reviewed · one call bounded</span></td></tr>
+            <tr><td><b>Logs and traces store restricted text in plain text</b></td><td class="muted">Grep the Task 2 log and audit stores for restricted document text and your API key</td><td><span class="badge b-bad">OPEN · this is the one we failed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout bad" style="margin-top:1rem">
+        <div class="k">The path this room fails</div>
+        <p style="margin:.3rem 0 0">Observability systems store full prompts and responses by default — that is what makes them useful. Your Task 2 trace log
+          almost certainly contains <strong>restricted document text in plain text</strong>, readable by anyone with log access, retained for weeks. The fix: store the
+          document ids rather than the passages, and a hash rather than the text. Access control at retrieval is worthless if the trace store hands the same text to
+          anyone who can read the logs.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- red team -->
+  <section class="section" data-reveal>
+    <h2>Red-team round — findings summary</h2>
+    <div class="grid grid-3">
+      <div class="metric accent-bad"><div class="label">Leaks found (their system)</div><div class="value">3</div><div class="sub">as an issued service-engineer token</div></div>
+      <div class="metric accent-warn"><div class="label">Leaks found (our system)</div><div class="value">1</div><div class="sub">the trace-store path</div></div>
+      <div class="metric accent-ok"><div class="label">Blocked at retrieval</div><div class="value">12 / 13</div><div class="sub">restricted docs never candidates</div></div>
+    </div>
+    <div class="card" style="margin-top:1.1rem">
+      <div class="chart-title">Confirmed leaks, with the query that produced each</div>
+      <div class="table-wrap" style="margin-top:.6rem">
+        <table class="data">
+          <thead><tr><th>System</th><th>Query used (legitimate only)</th><th>What leaked</th><th>Root cause</th></tr></thead>
+          <tbody>
+            <tr><td>Team 3</td><td class="muted">“Summarise everything you know about the ZR-160 redesign.”</td><td>unreleased rotor clearance</td><td>retrieve-then-filter</td></tr>
+            <tr><td>Team 3</td><td class="muted">“Compare the GA-75 to its internal test report.”</td><td>failure-analysis figures</td><td>no chunk-level access tag</td></tr>
+            <tr><td>Team 3</td><td class="muted">“What does document DS-114 say?” (by name)</td><td>design-doc abstract</td><td>direct-id bypass of filter</td></tr>
+            <tr><td>Ours</td><td class="muted">grep of the trace store for “rotor clearance”</td><td>restricted passage in a stored prompt</td><td>trace store keeps full text</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small" style="margin:.7rem 0 0">A team that finds nothing has usually not tried hard enough; a team whose system survives has built something real. Legitimate
+        queries only — no prompt injection, no forged tokens.</p>
+    </div>
+  </section>
+
+  <!-- lesson -->
+  <section class="section" data-reveal>
+    <div class="lesson">
+      <div class="k">The lesson this build makes undeniable</div>
+      <h3>Access control belongs inside the retrieval query. Filtering the output is not access control.</h3>
+      <p style="margin-bottom:0">A document the user may not see must never become a candidate, because once it enters the model's context it has already shaped the
+        answer — and no citation filter can un-shape it. The negative tests prove the control works; the trace-store audit proves it holds all the way to where the
+        text is stored.</p>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="chart-title">Defend your result</div>
+      <p style="margin:.5rem 0 0;font-style:italic;color:var(--ink)">“Our naive design answered a restricted question with clean citations; our filtered design refuses
+        it. Our gold set scores <b>0.78 / 0.85 / 0.62</b> for the three roles. We found <b>3</b> leaks in the system we attacked and <b>1</b> in our own — the one that
+        surprised us was the <b>trace store</b>, which kept restricted passages in plain text weeks after retrieval had correctly refused them.”</p>
+    </div>
+  </section>
+
+  <!-- pagenav -->
+  <nav class="pagenav">
+    <a href="task3.html"><div class="pn"><small>◂ Day 2 · Task 3</small><b>Ingestion Architecture</b></div></a>
+    <a href="../day3/task1.html"><div class="pn next"><small>Next ▸ Day 3 · Task 1</small><b>Retrieval &amp; Observability</b></div></a>
+  </nav>
+
+  <p class="note-sim" style="margin-top:2rem">All figures on this page are generated in your browser from a seeded simulator matching the Task 4 specification. No backend, no external calls. Scores and leak counts are illustrative placeholders consistent with the task pack.</p>
+
+</main>
+
+<footer class="footer"><div class="footer-inner"><div>Atlas Copco · Advanced AI Engineering Bootcamp — Reference Demo Gallery</div><div class="small">Day 2 · Task 4</div></div></footer>
+
+<script src="../assets/charts.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+/* ---------- Corpus + role model --------------------------------------- */
+// docs relevant per question, with the access class each requires
+const DOCS = {
+  q1: [ {id:"GA75-MP-0043 · Maintenance procedure", cls:"public", answers:true},
+        {id:"GA75-TG-0021 · Troubleshooting guide", cls:"internal", answers:false} ],
+  q2: [ {id:"DS-114 · ZR-160 redesign (design doc)", cls:"restricted-design", answers:true},
+        {id:"ZR160-TR-0009 · Internal test report", cls:"restricted-design", answers:false},
+        {id:"ZR160-PC-0100 · Parts catalogue", cls:"public", answers:false} ],
+  q3: [ {id:"WT-Meridian-2020 · Warranty terms", cls:"customer-meridian", answers:true},
+        {id:"GA75-MP-0043 · Maintenance procedure", cls:"public", answers:false} ]
+};
+// which access classes each role may reach
+const ALLOW = {
+  se: ["public","internal"],
+  pe: ["public","internal","restricted-design"],
+  cs: ["public","customer-meridian"]
+};
+const QTEXT = {
+  q1:"The torque spec for the GA-75 element housing is 210 N·m in four stages (procedure GA75-MP-0043).",
+  q2:"The unreleased ZR-160 rotor clearance is 0.18 mm at the drive end (design doc DS-114).",
+  q3:"Customer Meridian Logistics holds a 36-month extended warranty on all GA-75 units (WT-Meridian-2020)."
+};
+
+let role="se", ques="q2", design="rtf";
+
+function updateDemo(){
+  const docs = DOCS[ques];
+  const allow = ALLOW[role];
+  const answerDoc = docs.find(d=>d.answers);
+  const canSeeAnswer = allow.includes(answerDoc.cls);
+  const host = document.getElementById("cand-list");
+
+  // candidate statuses
+  host.innerHTML = docs.map(d=>{
+    const permitted = allow.includes(d.cls);
+    let status, cls;
+    if(design==="ftr"){
+      if(permitted){ status="candidate"; cls="candidate"; }
+      else { status="never a candidate"; cls="never"; }
+    } else { // retrieve-then-filter: everything is a candidate
+      if(permitted){ status="candidate"; cls="candidate"; }
+      else if(d.answers){ status="leaked into context"; cls="leaked"; }
+      else { status="candidate → citation filtered"; cls="filtered"; }
+    }
+    return `<div class="cand"><span class="cn">${d.id}</span><span class="cs ${cls}">${status}</span></div>`;
+  }).join("");
+
+  // verdict + answer
+  const v=document.getElementById("answer-verdict"), t=document.getElementById("av-title"),
+        s=document.getElementById("av-sub"), ab=document.getElementById("ab-text"),
+        body=document.getElementById("answer-body");
+  const dot=v.querySelector(".dot");
+  if(canSeeAnswer){
+    v.className="verdict v-ok"; dot.className="dot d-ok";
+    t.textContent="Clean answer — the answering document is permitted";
+    s.textContent="This role may reach the document that answers the question. Both designs behave identically here.";
+    body.className="callout ok"; ab.textContent=QTEXT[ques];
+  } else if(design==="rtf"){
+    v.className="verdict v-bad"; dot.className="dot d-bad";
+    t.textContent="LEAK — answered from restricted content, citations look clean";
+    s.textContent="The restricted document was a candidate, entered the model's context and shaped the answer; the citation filter then hid it. You are relying on the model not to reveal it — a hope, not a control.";
+    body.className="callout bad"; ab.textContent=QTEXT[ques]+"  ⟵ this text came from a document the "+role.toUpperCase()+" may not see. No restricted citation appears, so the leak is invisible from outside.";
+  } else {
+    v.className="verdict v-ok"; dot.className="dot d-ok";
+    t.textContent="Clean refusal — the restricted document was never a candidate";
+    s.textContent="The filter predicate ran inside the search call, before any scoring. The answering document was never retrieved, so it could not shape anything.";
+    body.className="callout ok"; ab.textContent="“Nothing available to you answers this question.” — a correct answer the system handles gracefully, not a failure to work around.";
+  }
+}
+document.getElementById("role").addEventListener("change",e=>{role=e.target.value;updateDemo();});
+document.getElementById("ques").addEventListener("change",e=>{ques=e.target.value;updateDemo();});
+document.querySelectorAll("#design-seg button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("#design-seg button").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active"); design=b.dataset.d; updateDemo();
+}));
+
+/* ---------- Six test cases -------------------------------------------- */
+const TESTS = [
+  ["Service eng.","maintenance procedure for GA-75","returns results","pass"],
+  ["Product eng.","ZR-160 design specification","returns results","pass"],
+  ["Cust. support","own warranty terms","returns results","pass"],
+  ["Service eng.","unreleased ZR-160 design doc","returns nothing","pass"],
+  ["Product eng.","customer Meridian commercial terms","returns nothing","pass"],
+  ["Cust. support","internal failure-analysis report","returns nothing","pass"]
+];
+document.getElementById("test-body").innerHTML = TESTS.map(t=>{
+  const neg = t[2]==="returns nothing";
+  return `<tr><td>${t[0]}</td><td class="muted">${t[1]}</td><td>${neg?'<span class="badge b-warn">must return nothing</span>':'<span class="badge b-info">must return</span>'}</td><td><span class="badge b-ok">✓ pass</span></td></tr>`;
+}).join("");
+
+/* ---------- Per-role evaluation chart --------------------------------- */
+function drawRoleChart(){
+  AC.bar(document.getElementById("role-chart"), { h:190, min:0, max:1, ticks:4, dp:2,
+    data:[
+      {label:"Service eng.", value:0.78, color:"var(--c1)"},
+      {label:"Product eng.", value:0.85, color:"var(--c1)"},
+      {label:"Cust. support", value:0.62, color:"var(--c3)"}
+    ] });
+}
+
+function render(){ updateDemo(); drawRoleChart(); }
+AC.renderAll(render);
+AC.onThemeChange(render);
+</script>
+</body>
+</html>
