@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Three MCP Servers · Day 3 Task 3</title>
+<meta name="description" content="Reference demo: three MCP servers with full tool contracts — measuring how much a description matters, and demonstrating the confused-deputy failure and its fix.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../index.html"><span class="logo">AC</span><span>Advanced AI Engineering<small>Demo Gallery</small></span></a>
+    <span class="spacer"></span>
+    <nav>
+      <a href="../index.html">◂ All demos</a>
+      <a href="task4.html">Next: Fix a Weak Pipeline ▸</a>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">☾</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div class="crumbs"><a href="../index.html">Gallery</a> › Day 3 · Production-Grade RAG, MCP &amp; Observability › Task 3</div>
+    <div class="tags">
+      <span class="badge b-blue">Day 3 · Task 3</span>
+      <span class="badge">Lab 4</span>
+      <span class="badge tag-mods">MODULE 4 · TOOL CONTRACTS · AUTHORISATION BOUNDARY · FAILURE SEMANTICS · CONFUSED DEPUTY</span>
+    </div>
+    <h1>Three MCP Servers</h1>
+    <p class="tagline">A vague tool description causes wrong calls that look exactly like a model reasoning problem — so teams
+      change the model, and the problem persists. And identity has to reach the server: if the server trusts the client, one
+      credential leaks data no logs flag. Two failures, neither of them a model failure.</p>
+  </div>
+
+  <!-- scenario -->
+  <section class="section" data-reveal>
+    <h2>The scenario</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <p>A knowledge assistant that retrieves technical documents, queries a service-ticket store and calls a diagnostic
+           lookup. Three capabilities, owned by three different teams in real life, built here as three MCP servers over stdio —
+           small self-contained processes backed by SQLite or JSON, because the point is the <strong>contract</strong>, not the storage.</p>
+        <p style="margin-bottom:0"><b>The arithmetic to lead with:</b> five AI applications across eight enterprise systems is
+           forty bespoke integrations — each with its own auth, error semantics, versioning and security review. Or eight
+           governed servers, each built and reviewed once, consumed by any client. MCP turns integration from an application
+           concern into a platform concern.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:.6rem">Integration maths</h3>
+        <div class="grid grid-2" style="margin-bottom:.4rem">
+          <div class="metric accent-bad"><div class="label">Point-to-point</div><div class="value">40</div><div class="sub">5 apps × 8 systems</div></div>
+          <div class="metric accent-ok"><div class="label">Governed servers</div><div class="value">8</div><div class="sub">reviewed once each</div></div>
+        </div>
+        <dl class="kv">
+          <dt>doc-search</dt><dd>search_documents(query,family?,status?)</dd>
+          <dt>ticket-history</dt><dd>find_tickets(asset_id,symptom?,since?)</dd>
+          <dt>parts-catalogue</dt><dd>lookup_part · find_parts_for</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- what to build -->
+  <section class="section" data-reveal>
+    <h2>What the attendees must build</h2>
+    <ul class="checklist grid-2 grid">
+      <li>Three MCP servers over stdio, each callable, backed by SQLite/JSON</li>
+      <li>A complete six-element contract per tool — no element skipped</li>
+      <li>30 realistic requests with the expected tool and arguments recorded</li>
+      <li>Tool-selection &amp; argument accuracy, vague vs rewritten descriptions, same model/prompt</li>
+      <li>The confused deputy demonstrated <b>and</b> fixed — same request, both outcomes</li>
+      <li>Twelve failure-semantics tests: not-found / unauthorised / timeout / downstream, × 3 servers</li>
+      <li>An egress-review table — one row per tool, what data leaves and to where</li>
+      <li>One honest row: a capability that should <em>not</em> be an MCP tool, and why</li>
+    </ul>
+  </section>
+
+  <!-- THE SERVERS -->
+  <section class="section" data-reveal>
+    <h2>The live integration surface</h2>
+
+    <div id="verdict" class="verdict v-warn" style="margin-bottom:1rem">
+      <span class="dot d-warn"></span>
+      <div>
+        <div class="vt">Description rewrite alone: tool-selection 63% → 94%, argument accuracy 58% → 90%</div>
+        <div class="vs">Same model, same prompt, same servers. The only change was the words in the tool description. A vague description is the least-discussed cause of agent failure.</div>
+      </div>
+    </div>
+
+    <!-- three server contract cards -->
+    <div class="grid grid-3 keep2">
+      <div class="card">
+        <div class="chart-title mono">doc-search</div>
+        <div class="chart-sub">retrieval component from Task 2, reused</div>
+        <dl class="kv" style="margin-top:.5rem">
+          <dt>name</dt><dd>search_documents</dd>
+          <dt>desc</dt><dd class="muted" style="font-family:var(--sans)">Find service bulletins &amp; procedures by topic. Use for “how/why” questions; not for ticket history.</dd>
+          <dt>input</dt><dd>query:str · family?:enum · status?:enum</dd>
+          <dt>output</dt><dd>[{doc_id,title,snippet,score}]</dd>
+          <dt>errors</dt><dd>NOT_FOUND · UNAUTHORISED · UNAVAILABLE</dd>
+          <dt>example</dt><dd class="muted" style="font-family:var(--sans)">“cooler fouling on GA-30” → 5 docs</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <div class="chart-title mono">ticket-history</div>
+        <div class="chart-sub">500 service tickets across 40 assets</div>
+        <dl class="kv" style="margin-top:.5rem">
+          <dt>name</dt><dd>find_tickets</dd>
+          <dt>desc</dt><dd class="muted" style="font-family:var(--sans)">Past service tickets for a known asset. Use when the request names an asset ID; not for general how-to.</dd>
+          <dt>input</dt><dd>asset_id:str · symptom?:str · since?:date</dd>
+          <dt>output</dt><dd>[{ticket_id,date,symptom,action}]</dd>
+          <dt>errors</dt><dd>NOT_FOUND · UNAUTHORISED · TIMEOUT</dd>
+          <dt>example</dt><dd class="muted" style="font-family:var(--sans)">asset “AC-1183”, since 2025-01 → 7</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <div class="chart-title mono">parts-catalogue</div>
+        <div class="chart-sub">catalogue with realistic part numbers</div>
+        <dl class="kv" style="margin-top:.5rem">
+          <dt>name</dt><dd>lookup_part · find_parts_for</dd>
+          <dt>desc</dt><dd class="muted" style="font-family:var(--sans)">Resolve a part number to its spec, or list parts for an assembly. Exact identifiers only.</dd>
+          <dt>input</dt><dd>part_number:str &nbsp;/&nbsp; assembly:str</dd>
+          <dt>output</dt><dd>{part_number,desc,spec,supersedes}</dd>
+          <dt>errors</dt><dd>NOT_FOUND · DOWNSTREAM_UNAVAILABLE</dd>
+          <dt>example</dt><dd class="muted" style="font-family:var(--sans)">“HX-4471-B” → torque, qty, super.</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- the experiment -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">The experiment — how much does the description matter?</div>
+          <div class="chart-sub">30 realistic requests, each with a known-correct tool and arguments. Run once with vague, implementation-focused descriptions; rewrite to the six-element standard; re-run. Change nothing else.</div>
+        </div>
+        <div class="control-row">
+          <label class="switch"><input type="checkbox" id="desc-toggle"><span class="track"></span>Show rewritten descriptions</label>
+        </div>
+      </div>
+      <div class="grid grid-2 keep2">
+        <div id="exp-chart"></div>
+        <div>
+          <div class="grid grid-2" style="margin-bottom:.6rem">
+            <div class="metric accent-blue"><div class="label">Tool selection</div><div class="value" id="m-sel">63%</div><div class="sub" id="m-sel-sub">vague descriptions</div></div>
+            <div class="metric accent-blue"><div class="label">Argument accuracy</div><div class="value" id="m-arg">58%</div><div class="sub" id="m-arg-sub">of 30 requests</div></div>
+          </div>
+          <div class="callout" style="background:var(--surface-2)" id="exp-note">
+            <div class="k">A wrong call that looks like a model failure</div>
+            <p style="margin:.3rem 0 0">With a vague description, requests for ticket history get routed to <span class="mono">search_documents</span>
+              because the name alone looked plausible. It reads as a reasoning error — so teams change the model, and the
+              accuracy does not move. Toggle the rewrite to see where the number goes.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- confused deputy -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">The authorisation boundary — the confused deputy</div>
+          <div class="chart-sub">The same low-privilege request (<span class="mono">viewer</span> role asks for a restricted maintenance-cost field). One design leaks it; the other refuses it.</div>
+        </div>
+        <div class="seg" id="deputy-seg">
+          <button class="active" data-d="wrong">Wrong design</button>
+          <button data-d="right">Right design</button>
+        </div>
+      </div>
+      <div class="grid grid-2 keep2">
+        <div id="deputy-diagram"></div>
+        <div id="deputy-panel"></div>
+      </div>
+      <p class="small" style="margin:.8rem 0 0"><b>Tool authorisation derives from who the caller is, never from what the model
+        read.</b> If retrieved content could cause a tool to be invoked with authority the caller does not have, the boundary is
+        in the wrong place. The remaining four controls: per-role allow-lists enforced outside the model, full call logging,
+        idempotency on state-changing calls, and an approval gate on anything irreversible.</p>
+    </div>
+
+    <!-- failure semantics + egress -->
+    <div class="grid grid-2" style="margin-top:1.1rem">
+      <div class="card">
+        <div class="chart-title">Failure semantics — twelve tests, all defined</div>
+        <div class="chart-sub">Four cases × three servers. A tool that raises an exception leaves the model with nothing usable and it will improvise. Every cell returns a defined, typed response instead.</div>
+        <div id="fail-grid" style="overflow-x:auto;margin-top:.4rem"></div>
+        <div class="table-wrap" style="margin-top:.8rem">
+          <table class="data">
+            <thead><tr><th>Case</th><th>Defined response</th></tr></thead>
+            <tbody>
+              <tr><td>not-found</td><td class="mono">{status:"not_found", detail}</td></tr>
+              <tr><td>unauthorised</td><td class="mono">{status:"unauthorised", reason}</td></tr>
+              <tr><td>timeout</td><td class="mono">{status:"timeout", retry_after}</td></tr>
+              <tr><td>downstream</td><td class="mono">{status:"unavailable", source}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="chart-title">Egress review — one row per tool</div>
+        <div class="chart-sub">What data leaves your boundary when the tool is called, and to where. A five-minute exercise that has stopped real deployments — easiest while the contracts are fresh.</div>
+        <div class="table-wrap" style="margin-top:.6rem">
+          <table class="data">
+            <thead><tr><th>Tool</th><th>Data that leaves</th><th>To where</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">search_documents</td><td>query text, family/status filter</td><td class="muted">embedding endpoint (Azure)</td></tr>
+              <tr><td class="mono">find_tickets</td><td>asset_id, symptom string</td><td class="muted">internal ticket DB only</td></tr>
+              <tr><td class="mono">lookup_part</td><td>part number</td><td class="muted">internal catalogue only</td></tr>
+              <tr><td class="mono">find_parts_for</td><td>assembly name</td><td class="muted">internal catalogue only</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout warn" style="margin-top:.9rem">
+          <div class="k">Not everything should be a tool</div>
+          <p style="margin:.3rem 0 0"><b>retrieve-context</b>, the pre-generation retrieval step, should <em>not</em> be an MCP
+            tool. The model never decides whether it runs — it always runs before generation. That makes it a pipeline stage;
+            wrapping it in MCP adds latency and indirection for nothing. Use MCP when the model chooses at runtime.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- the trap -->
+  <section class="section" data-reveal>
+    <h2>The trap that looks like a model problem</h2>
+    <div class="callout bad">
+      <div class="k">The vague description</div>
+      <p style="margin:.3rem 0 0">“Searches the document store using the retrieval component.” It describes the
+        <em>implementation</em>, offers no “when not to use”, and no examples. The model infers usage from the name and calls it
+        for ticket questions too. Selection accuracy sits at <b>63%</b> — and every retry with a stronger model leaves it there.</p>
+    </div>
+    <div class="callout bad">
+      <div class="k">The confused deputy</div>
+      <p style="margin:.3rem 0 0">The server holds one high-privilege credential and trusts the client to have checked. A
+        low-privilege caller asks a question; the server executes with its own high privilege and returns data the caller may
+        not see. Nothing in the logs looks unusual. This is very easily introduced and it is the classic vulnerability of the
+        architecture.</p>
+    </div>
+    <div class="callout">
+      <div class="k">Write the description twice</div>
+      <p style="margin:.3rem 0 0">Once for the implementer, once for a competent new colleague who has never seen the system.
+        That second reader is exactly who your tool description has — except it will never ask a clarifying question. Compare
+        which version the model actually uses correctly.</p>
+    </div>
+  </section>
+
+  <!-- lesson -->
+  <section class="section" data-reveal>
+    <div class="lesson">
+      <div class="k">The lesson this build makes undeniable</div>
+      <h3>A tool contract is an interface, and identity is part of it.</h3>
+      <p style="margin-bottom:0">The description is written for a model, not a human, and it is the least-discussed cause of agent
+        failure — your before-and-after numbers turn that from an opinion into evidence. And authorisation belongs at the
+        server, deciding from who the caller is, never from what the model read.</p>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="chart-title">Defend your result</div>
+      <p style="margin:.5rem 0 0;font-style:italic;color:var(--ink)">“Vague descriptions gave <b>63%</b> tool-selection accuracy;
+        rewritten ones gave <b>94%</b>. We changed no model and no prompt. Our confused-deputy demonstration returned
+        <b>restricted cost data</b> before identity propagation and <b>a refusal</b> after. The tool we decided should not be a
+        tool is <b>retrieve-context</b> — the model never chooses whether it runs.”</p>
+    </div>
+  </section>
+
+  <!-- pagenav -->
+  <nav class="pagenav">
+    <a href="task2.html"><div class="pn"><small>◂ Day 3 · Task 2</small><b>Retrieval Strategy Benchmark</b></div></a>
+    <a href="task4.html"><div class="pn next"><small>Next ▸ Day 3 · Task 4</small><b>Fix a Weak Pipeline, and Watch It</b></div></a>
+  </nav>
+
+  <p class="note-sim" style="margin-top:2rem">All figures on this page are generated in your browser from a seeded simulator matching the task specification. No backend, no external calls. Accuracy figures are illustrative placeholders consistent with the task pack.</p>
+
+</main>
+
+<footer class="footer"><div class="footer-inner"><div>Atlas Copco · Advanced AI Engineering Bootcamp — Reference Demo Gallery</div><div class="small">Day 3 · Task 3</div></div></footer>
+
+<script src="../assets/charts.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+/* ---- experiment: vague vs rewritten --------------------------------------- */
+let rewritten = false;
+document.getElementById("desc-toggle").addEventListener("change", e=>{ rewritten = e.target.checked; render(); });
+
+/* ---- confused deputy ------------------------------------------------------- */
+let deputy = "wrong";
+document.querySelectorAll("#deputy-seg button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("#deputy-seg button").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active"); deputy=b.dataset.d; render();
+}));
+
+function renderDeputyPanel(){
+  const el = document.getElementById("deputy-panel");
+  if(deputy==="wrong"){
+    el.innerHTML =
+      '<div class="callout bad"><div class="k">Wrong · server trusts the client</div>'+
+      '<p style="margin:.3rem 0 .5rem">The server holds one high-privilege credential and assumes the client checked.</p>'+
+      '<pre class="mono" style="margin:0;font-size:.78rem;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:.6rem;white-space:pre-wrap">'+
+      'caller: viewer\nrequest: cost field for AC-1183\nserver → DB (as: service-admin)\nRESULT: € 4,120  ⚠ leaked\nlog: nothing unusual</pre></div>';
+  } else {
+    el.innerHTML =
+      '<div class="callout ok"><div class="k">Right · identity propagated</div>'+
+      '<p style="margin:.3rem 0 .5rem">The caller’s identity reaches the server; the server makes its own decision.</p>'+
+      '<pre class="mono" style="margin:0;font-size:.78rem;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:.6rem;white-space:pre-wrap">'+
+      'caller: viewer\nrequest: cost field for AC-1183\nserver checks role → deny\nRESULT: {status:"unauthorised"}\nlog: viewer denied cost field</pre></div>';
+  }
+}
+
+/* ---- render --------------------------------------------------------------- */
+function render(){
+  const sel = rewritten ? 94 : 63;
+  const arg = rewritten ? 90 : 58;
+  document.getElementById("m-sel").textContent = sel + "%";
+  document.getElementById("m-arg").textContent = arg + "%";
+  document.getElementById("m-sel-sub").textContent = rewritten ? "rewritten to standard" : "vague descriptions";
+  // experiment grouped bar
+  AC.bar(document.getElementById("exp-chart"), {
+    h:280, dp:0, vfmt:v=>v+"%", max:100, ticks:5,
+    groups:{ categories:["Tool selection","Argument accuracy"], series:[
+      {name:"Vague",     color:"var(--bad)", values:[63,58]},
+      {name:"Rewritten", color:"var(--ok)",  values:[94,90]}
+    ]}
+  });
+  // failure-semantics grid (all pass)
+  const F = [[1,1,1,1],[1,1,1,1],[1,1,1,1]];
+  AC.heatmap(document.getElementById("fail-grid"), {
+    matrix:F, rows:["doc-search","ticket-history","parts-catalogue"],
+    cols:["not-found","unauth","timeout","downstream"], cell:64, lblL:130, lblT:26,
+    fmt:()=> "✓ pass",
+    cellColor:()=> AC.cssVar("--ok","#1f9d55")
+  });
+  // deputy diagram: simple donut-ish indicator
+  const leaked = deputy==="wrong";
+  AC.donut(document.getElementById("deputy-diagram"), {size:170, stroke:20, round:true,
+    segments: leaked ? [{value:1,color:"var(--bad)"}] : [{value:1,color:"var(--ok)"}],
+    center: leaked ? "LEAK" : "DENY",
+    centerSub: leaked ? "restricted data returned" : "refused at server"});
+  renderDeputyPanel();
+}
+AC.renderAll(render);
+AC.onThemeChange(render);
+</script>
+</body>
+</html>
