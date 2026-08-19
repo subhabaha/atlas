@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The MLOps Pipeline, Built · Day 4 Task 3</title>
+<meta name="description" content="Reference demo: four versions bound on every run, a seven-stage pipeline, an evaluation gate that actually rejects a deliberately worse model, a stopwatch-timed rollback, shadow-deployment disagreement, and a label-free monitor firing before any accuracy figure could exist.">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  .stageflow { display:flex; flex-wrap:wrap; gap:.4rem; align-items:stretch; }
+  .stage { flex:1 1 120px; min-width:110px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-s);
+           padding:.6rem .7rem; position:relative; }
+  .stage .sn { font-family:var(--mono); font-size:.72rem; color:var(--ink-3); font-weight:700; }
+  .stage .st { font-size:.9rem; font-weight:700; color:var(--ink); }
+  .stage .sd { font-size:.74rem; color:var(--ink-3); margin-top:.15rem; }
+  .stage.gate { border-color:var(--ac-blue); background:color-mix(in srgb,var(--ac-blue) 10%, var(--surface)); box-shadow:var(--shadow-s); }
+  .stage.gate .st { color:var(--ac-blue); }
+  .manifest { font-family:var(--mono); font-size:.82rem; line-height:1.55; background:var(--surface-2); border:1px solid var(--border);
+              border-radius:var(--radius-s); padding:1rem 1.1rem; overflow-x:auto; color:var(--ink-2); }
+  .manifest .k { color:var(--ac-blue); } .manifest .s { color:var(--c5); } .manifest .n { color:var(--c3); }
+  .gaterow { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.55rem .2rem; border-bottom:1px solid var(--border); }
+  .gaterow:last-child { border-bottom:none; }
+  .gaterow .cond { font-size:.9rem; color:var(--ink-2); }
+  .gaterow .obs { font-family:var(--mono); font-size:.85rem; color:var(--ink); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../index.html"><span class="logo">AC</span><span>Advanced AI Engineering<small>Demo Gallery</small></span></a>
+    <span class="spacer"></span>
+    <nav>
+      <a href="../index.html">◂ All demos</a>
+      <a href="task4.html">Next: The Feedback Loop ▸</a>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">☾</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div class="crumbs"><a href="../index.html">Gallery</a> › Day 4 · Vision, MLOps &amp; Feedback Loops › Task 3</div>
+    <div class="tags">
+      <span class="badge b-blue">Day 4 · Task 3</span>
+      <span class="badge">Lab 3</span>
+      <span class="badge tag-mods">MODULE 3 · FOUR VERSIONS BOUND · EVALUATION GATE · REGISTRY · SHADOW DEPLOYMENT · ROLLBACK</span>
+    </div>
+    <h1>The MLOps Pipeline, Built</h1>
+    <p class="tagline">A gate that has never rejected anything is not a gate — it is a logging statement. And rollback time
+      is <strong>a number or it is a hope</strong>. MLOps is not a toolchain; it is five questions made answerable, and this
+      bench answers them with a model that actually gets blocked.</p>
+  </div>
+
+  <!-- ---------------------------------------------------------- scenario -->
+  <section class="section" data-reveal>
+    <h2>The scenario</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <p>Do not start with the tooling; start with the unanswered question. Buying a platform to solve a discipline problem
+           is how organisations end up with an expensive platform and the same problem. Five questions, and if the honest
+           answer to any is <em>no</em>, that is your priority.</p>
+        <div class="table-wrap" style="margin-top:.6rem">
+          <table class="data">
+            <thead><tr><th>The question</th><th>What answers it</th></tr></thead>
+            <tbody>
+              <tr><td>Can you reproduce a result?</td><td class="muted">Four versions bound to every run</td></tr>
+              <tr><td>Can you roll back?</td><td class="muted">A registry + a stopwatch-timed rollback</td></tr>
+              <tr><td>Can you tell it degraded?</td><td class="muted">Monitoring — three signals need no labels</td></tr>
+              <tr><td>Can you ship a change safely?</td><td class="muted">A gate that rejects something today</td></tr>
+              <tr><td>Can you retrain reliably?</td><td class="muted">Triggers with a threshold <em>and</em> a duration</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:.6rem">The binding — four versions on every run <span class="note-sim">manifest.json (auto-written)</span></h3>
+        <div class="manifest"><span class="k">"dataset"</span>:      <span class="s">"crack-40k"</span> @ <span class="n">"a1f4c9e"</span>,<br>
+<span class="k">"features"</span>:     <span class="s">"mnetv3-penult"</span> @ <span class="n">"7d2be08"</span>,<br>
+<span class="k">"model"</span>:        <span class="s">"logreg-C0.5"</span> @ <span class="n">"v2.4"</span>,<br>
+<span class="k">"label_guide"</span>:  <span class="s">"guideline"</span> @ <span class="n">"g3-boundary"</span>,<br>
+<span class="k">"trained_by"</span>:   <span class="s">"m.okonkwo"</span>,<br>
+<span class="k">"hypothesis"</span>:   <span class="s">"relabel raises recall ≥0.06"</span></div>
+        <p class="small" style="margin:.7rem 0 0">Roll back the model without rolling back the feature code and you get a model
+          running on inputs it was never trained for — often worse than either version alone. The binding is the point; a run
+          missing any of the four <strong>fails</strong>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- what to build -->
+  <section class="section" data-reveal>
+    <h2>What the attendees must build</h2>
+    <ul class="checklist grid-2 grid">
+      <li>Four versions — dataset, feature, model, label-guideline — bound and <b>auto-recorded on every run</b>, a missing one failing</li>
+      <li>The seven-stage pipeline: commit · validate · train · evaluate · <b>gate</b> · register · deploy</li>
+      <li>An evaluation gate with criteria set <b>before</b> the run, that <b>actually rejects a deliberately worse model today</b></li>
+      <li>A registry recording lineage, per-class + per-slice metrics, approver and known limitations</li>
+      <li>A rollback <b>timed with a stopwatch</b>, from cold start, by someone who did not build the pipeline</li>
+      <li>Shadow deployment running, with a <b>disagreement rate</b> reported and localised</li>
+      <li>The input-distribution monitor <b>firing on the shifted group</b> before any labelled accuracy figure could exist</li>
+      <li>Retraining triggers each written with <b>a threshold and a duration</b>, not a threshold alone</li>
+    </ul>
+  </section>
+
+  <!-- ---------------------------------------------------------- THE PIPELINE -->
+  <section class="section" data-reveal>
+    <h2>The live pipeline</h2>
+
+    <!-- stage flow -->
+    <div class="card">
+      <div class="chart-title">Seven stages — the gate is what makes it MLOps rather than CI</div>
+      <div class="chart-sub">Continuous integration ships code that compiles. A pipeline ships a model that clears a bar set before the run. The difference is stage five.</div>
+      <div class="stageflow" style="margin-top:.9rem">
+        <div class="stage"><div class="sn">01</div><div class="st">commit</div><div class="sd">code + config hashed</div></div>
+        <div class="stage"><div class="sn">02</div><div class="st">validate</div><div class="sd">schema, four versions present</div></div>
+        <div class="stage"><div class="sn">03</div><div class="st">train</div><div class="sd">logreg on cached features</div></div>
+        <div class="stage"><div class="sn">04</div><div class="st">evaluate</div><div class="sd">per-class, per-slice, calibration</div></div>
+        <div class="stage gate"><div class="sn">05</div><div class="st">gate ▾</div><div class="sd">PASS = ALL conditions</div></div>
+        <div class="stage"><div class="sn">06</div><div class="st">register</div><div class="sd">MLflow + lineage tags</div></div>
+        <div class="stage"><div class="sn">07</div><div class="st">deploy</div><div class="sd">shadow → canary → serve</div></div>
+      </div>
+    </div>
+
+    <!-- THE GATE -->
+    <div class="card" style="margin-top:1.1rem">
+      <div id="gate-verdict" class="verdict v-bad" style="margin-bottom:1rem">
+        <span class="dot d-bad"></span>
+        <div>
+          <div class="vt" id="gv-title">GATE BLOCKED · candidate not deployed — working as designed</div>
+          <div class="vs" id="gv-sub">v2.5 fails on the primary metric and calibration. A gate that has never rejected anything is not a gate; this one just rejected something.</div>
+        </div>
+      </div>
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">The evaluation gate — push a candidate and watch it be judged</div>
+          <div class="chart-sub">PASS requires ALL five. FAIL means the model is not deployed, and it is not argued into production. Try the label-noise model — it must not get through.</div>
+        </div>
+        <div class="control" style="min-width:280px">
+          <label>Push candidate model</label>
+          <select id="cand-select">
+            <option value="ship">v2.4 · re-labelled + calibrated</option>
+            <option value="noise" selected>v2.5 · label noise left uncorrected</option>
+            <option value="small">v2.6 · fewer training images</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <div id="gate-rows"></div>
+        </div>
+        <div class="callout" id="gate-callout" style="margin:0">
+          <div class="k" id="gc-k">Why it blocked</div>
+          <p style="margin:.3rem 0 0" id="gc-text"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- registry + rollback -->
+    <div class="grid grid-2" style="margin-top:1.1rem">
+      <div class="card">
+        <div class="chart-title">Registry &amp; rollback — timed with a stopwatch</div>
+        <div class="chart-sub">How long from noticing a problem to the previous model serving again? Cold start, by someone who did not build it. If nobody knows the number, that is the first gap to close.</div>
+        <div class="grid grid-3 keep2" style="margin:.8rem 0">
+          <div class="metric accent-ok"><div class="label">Rollback time</div><div class="value">47<span style="font-size:1rem"> s</span></div><div class="sub">cold start · not the author</div></div>
+          <div class="metric"><div class="label">Serving</div><div class="value sm">v2.4</div><div class="sub">approved · m.okonkwo</div></div>
+          <div class="metric"><div class="label">Previous</div><div class="value sm">v2.3</div><div class="sub">one command away</div></div>
+        </div>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Version</th><th class="num">Recall (crack)</th><th>Env</th><th>Approver</th></tr></thead>
+            <tbody>
+              <tr><td>v2.4 <span class="badge b-ok">serving</span></td><td class="num">0.881</td><td>prod</td><td class="muted">m.okonkwo</td></tr>
+              <tr><td>v2.3</td><td class="num">0.847</td><td>prod-prev</td><td class="muted">m.okonkwo</td></tr>
+              <tr><td>v2.5</td><td class="num">0.842</td><td class="muted">blocked</td><td class="muted">— gate</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chart-title">Shadow deployment — real behaviour at zero user risk</div>
+        <div class="chart-sub">New model runs live; its output is not used. Log every disagreement against the current model — and against inspector judgement on the same physical parts — before anything changes on the line.</div>
+        <div class="grid grid-3 keep2" style="margin:.8rem 0">
+          <div class="metric accent-blue"><div class="label">Disagreement rate</div><div class="value">3.8%</div><div class="sub">over 40k shadow parts</div></div>
+          <div class="metric"><div class="label">Concentrated in</div><div class="value sm">low-light</div><div class="sub">where they differ most</div></div>
+          <div class="metric"><div class="label">Latency Δ</div><div class="value sm">+2 ms</div><div class="sub">within budget</div></div>
+        </div>
+        <div class="chart-sub">Disagreement rate by capture-condition slice</div>
+        <div id="shadow-chart"></div>
+      </div>
+    </div>
+
+    <!-- monitoring -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">Monitoring — the earliest signal needs no labels at all</div>
+          <div class="chart-sub">Feed the low-light group through as if it were a week of production. The input-distribution monitor fires days before any labelled accuracy figure could even be computed.</div>
+        </div>
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <div class="chart-sub">Input-distribution drift (PSI) vs when a labelled accuracy figure could first exist</div>
+          <div id="monitor-chart"></div>
+          <p class="small" style="margin:.6rem 0 0">The drift monitor crosses its 0.20 threshold on <b>day 3</b>. Labelled accuracy cannot exist until the review labels land on <b>day 9</b> — so the label-free signal buys <b>six days</b> of warning on a shift nobody logged as a change to the AI system.</p>
+        </div>
+        <div>
+          <div class="chart-sub">The monitoring signals — and which need no labels</div>
+          <div class="table-wrap" style="margin-top:.2rem">
+            <table class="data">
+              <thead><tr><th>Signal</th><th>Indicates</th><th>Label-free?</th></tr></thead>
+              <tbody>
+                <tr><td>Input distribution shift</td><td class="muted">capture / mix changed</td><td><span class="badge b-ok">yes · earliest</span></td></tr>
+                <tr><td>Confidence distribution</td><td class="muted">model less certain</td><td><span class="badge b-ok">yes</span></td></tr>
+                <tr><td>Deferral rate rising</td><td class="muted">more in uncertain band</td><td><span class="badge b-ok">yes</span></td></tr>
+                <tr><td>Reviewer override rate</td><td class="muted">humans disagree more</td><td><span class="badge b-info">if captured</span></td></tr>
+                <tr><td>Accuracy on fresh sample</td><td class="muted">actual performance</td><td><span class="badge b-bad">no · needs labels</span></td></tr>
+                <tr><td>Business outcome</td><td class="muted">escapes, scrap, warranty</td><td><span class="badge b-warn">lagging</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- retraining triggers -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="chart-title">Retraining triggers — a threshold <em>and</em> a duration</div>
+      <div class="chart-sub">Triggering on a single alarming week is how you retrain on noise. Every trigger needs both — and a logged physical change should trigger review even when every metric still looks fine.</div>
+      <div class="table-wrap" style="margin-top:.7rem">
+        <table class="data">
+          <thead><tr><th>Trigger</th><th class="num">Threshold</th><th class="num">Duration</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td>Accuracy below error budget (fresh sample)</td><td class="num">&lt; 0.90</td><td class="num">3 consecutive days</td><td class="muted">retrain + gate</td></tr>
+            <tr><td>New labelled data accumulated</td><td class="num">≥ 2,000 cases</td><td class="num">or 14 days, whichever first</td><td class="muted">retrain candidate</td></tr>
+            <tr><td>Input-distribution drift (PSI)</td><td class="num">&gt; 0.20</td><td class="num">sustained 48 h</td><td class="muted">review + shadow</td></tr>
+            <tr><td>Logged physical process change</td><td class="num">any</td><td class="num">immediate</td><td class="muted">review even if metrics fine</td></tr>
+            <tr><td>Scheduled cadence (floor)</td><td class="num">—</td><td class="num">quarterly</td><td class="muted">re-validate</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- the trap -->
+  <section class="section" data-reveal>
+    <h2>The trap that ships bad models quietly</h2>
+    <div class="callout bad">
+      <div class="k">A gate that has never rejected anything</div>
+      <p style="margin:.3rem 0 0">If your gate has approved every model it ever saw, you have a logging statement, not a gate — and you will not know which one you built until the day it matters.
+        The fastest way to find out is to train a deliberately worse model (label noise left uncorrected) and push it. Select <em>v2.5</em> above: it is blocked on the primary metric and calibration,
+        and <strong>it is not argued into production</strong>. That is what stops quality drifting downward one small exception at a time.</p>
+    </div>
+    <div class="callout warn">
+      <div class="k">Rolling back the model but not the feature code</div>
+      <p style="margin:.3rem 0 0">A model rolled back without its feature version runs on inputs it was never trained for, and frequently performs worse than either version alone. Teams discover this <em>during</em> an incident.
+        Bind all four versions on every run so a rollback restores the whole lineage, not just the weights.</p>
+    </div>
+    <div class="callout">
+      <div class="k">"We would have to check with the person who set it up"</div>
+      <p style="margin:.3rem 0 0">That is the same answer as "we do not know our rollback time." Time it with a stopwatch, cold, with someone who did not build the pipeline. Ours is <strong>47 seconds</strong>. A number you can defend beats
+        a capability you assume.</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- lesson -->
+  <section class="section" data-reveal>
+    <div class="lesson">
+      <div class="k">The lesson this build makes undeniable</div>
+      <h3>The evaluation gate is what makes MLOps real — and it only exists if it has rejected something.</h3>
+      <p style="margin-bottom:0">Reproducibility is four versions bound together. Recoverability is a rollback measured in seconds by a stranger to the code. Observability is a signal that fires before
+        the labels that would confirm it can exist. None of these is a platform you buy; each is a discipline you demonstrate — with a model that gets blocked, a stopwatch that gets read, and a monitor that
+        fires <b>six days</b> early.</p>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="chart-title">Defend your result</div>
+      <p style="margin:.5rem 0 0;font-style:italic;color:var(--ink)">"Our gate rejected a model that scored <b>0.905</b> because it did not beat production <b>0.912</b> and its calibration error was <b>0.071</b> against a 0.05 bar.
+        Rollback took <b>47 seconds</b>, done by someone who had not seen the pipeline. Shadow shows the two models disagreeing on <b>3.8%</b> of parts, concentrated in <b>low-light</b>. Our earliest degradation
+        signal is <b>input-distribution drift</b>, and it fires <b>six days</b> before any labelled accuracy figure could."</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- pagenav -->
+  <nav class="pagenav">
+    <a href="task2.html"><div class="pn"><small>◂ Day 4 · Task 2</small><b>Error Analysis Report &amp; Three Hypotheses</b></div></a>
+    <a href="task4.html"><div class="pn next"><small>Next ▸ Day 4 · Task 4</small><b>The Feedback Loop, With Arithmetic</b></div></a>
+  </nav>
+
+  <p class="note-sim" style="margin-top:2rem">All figures on this page are generated in your browser from a seeded simulator matching the Task 3 specification. No backend, no external calls. Version hashes, timings, disagreement and drift figures are illustrative placeholders consistent with the task pack.</p>
+
+</main>
+
+<footer class="footer"><div class="footer-inner"><div>Atlas Copco · Advanced AI Engineering Bootcamp — Reference Demo Gallery</div><div class="small">Day 4 · Task 3</div></div></footer>
+
+<script src="../assets/charts.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+/* ---- Evaluation gate ----------------------------------------------------- */
+const PROD = { primary:0.912, latencyBudget:40 };
+const CANDS = {
+  ship:  { name:"v2.4 · re-labelled + calibrated", primary:0.928, worstSlice:0.004, sliceName:"glare",        tests:[18,18], ece:0.031, latency:24 },
+  noise: { name:"v2.5 · label noise left uncorrected", primary:0.905, worstSlice:0.035, sliceName:"low-contrast", tests:[16,18], ece:0.071, latency:23 },
+  small: { name:"v2.6 · fewer training images", primary:0.898, worstSlice:0.028, sliceName:"small-defect",   tests:[18,18], ece:0.046, latency:19 }
+};
+function evalGate(c){
+  return [
+    { cond:"Primary metric &gt; production", obs:c.primary.toFixed(3)+" vs "+PROD.primary.toFixed(3), pass:c.primary>PROD.primary },
+    { cond:"No slice regresses &gt; 0.02", obs:"worst −"+c.worstSlice.toFixed(3)+" ("+c.sliceName+")", pass:c.worstSlice<=0.02 },
+    { cond:"All regression tests pass", obs:c.tests[0]+"/"+c.tests[1]+" cases", pass:c.tests[0]===c.tests[1] },
+    { cond:"Calibration error &lt; 0.05", obs:"ECE "+c.ece.toFixed(3), pass:c.ece<0.05 },
+    { cond:"Latency &lt; cycle-time budget", obs:c.latency+" ms vs "+PROD.latencyBudget+" ms", pass:c.latency<PROD.latencyBudget }
+  ];
+}
+let candKey = "noise";
+function drawGate(){
+  const c = CANDS[candKey];
+  const rows = evalGate(c);
+  const passAll = rows.every(r=>r.pass);
+  document.getElementById("gate-rows").innerHTML = rows.map(r=>`
+    <div class="gaterow">
+      <span class="cond">${r.cond}</span>
+      <span style="display:flex;align-items:center;gap:.7rem">
+        <span class="obs">${r.obs}</span>
+        <span class="badge ${r.pass?'b-ok':'b-bad'}" style="flex:none">${r.pass?'pass':'fail'}</span>
+      </span>
+    </div>`).join("");
+  const v = document.getElementById("gate-verdict");
+  v.className = "verdict "+(passAll?"v-ok":"v-bad");
+  v.querySelector(".dot").className = "dot "+(passAll?"d-ok":"d-bad");
+  const failed = rows.filter(r=>!r.pass);
+  const failNames = failed.map(r=>r.cond.replace(/&gt;/g,">").replace(/&lt;/g,"<")).join("; ");
+  document.getElementById("gv-title").textContent = passAll
+    ? "GATE PASSED · "+c.name+" cleared all five conditions — registering"
+    : "GATE BLOCKED · candidate not deployed — working as designed";
+  document.getElementById("gv-sub").textContent = passAll
+    ? "Beats production on the primary metric, no slice regresses, tests green, calibrated and within latency budget."
+    : c.name+" fails "+failed.length+" of 5: "+failNames+". A gate that has never rejected anything is not a gate.";
+  const gc = document.getElementById("gate-callout");
+  gc.className = "callout "+(passAll?"ok":"bad");
+  document.getElementById("gc-k").textContent = passAll ? "Why it passed" : "Why it blocked";
+  document.getElementById("gc-text").innerHTML = passAll
+    ? "Every condition set before the run is met. The model is registered with its lineage tags, then goes to shadow before it serves a single real decision — no argument required, because the bar was agreed in advance."
+    : "The criteria were fixed <em>before</em> this run, so there is nothing to negotiate. "+c.name+" is worse than what already serves ("+c.primary.toFixed(3)+" ≤ "+PROD.primary.toFixed(3)+")"+(c.ece>=0.05?" and mis-calibrated (ECE "+c.ece.toFixed(3)+")":"")+". It is blocked and never touches the line — which is exactly how quality is stopped from drifting downward one exception at a time.";
+}
+
+/* ---- charts -------------------------------------------------------------- */
+function drawShadow(){
+  AC.bar(document.getElementById("shadow-chart"), {
+    h:180, min:0, max:12, ticks:4, dp:1, vfmt:v=>v.toFixed(0)+"%",
+    data:[
+      {label:"normal", value:1.6, color:"var(--c1)"},
+      {label:"low-light", value:10.4, color:"var(--bad)"},
+      {label:"glare", value:3.1, color:"var(--c1)"},
+      {label:"blur", value:2.9, color:"var(--c1)"}
+    ]
+  });
+}
+function drawMonitor(){
+  // PSI drift climbs when low-light week begins (day 2); labelled accuracy only computable day 9
+  const drift=[[0,0.04],[1,0.05],[2,0.11],[3,0.22],[4,0.29],[5,0.31],[6,0.33],[7,0.34],[8,0.34],[9,0.35]];
+  // labelled accuracy series exists only from day 9 (the point where review labels land)
+  const acc=[[9,0.83],[10,0.82]];
+  AC.line(document.getElementById("monitor-chart"), {
+    h:250, xmin:0, xmax:10, ymin:0, ymax:0.4, legend:true,
+    xticks:[{v:0,label:"d0"},{v:3,label:"d3"},{v:6,label:"d6"},{v:9,label:"d9"}],
+    xlabel:"Days of shifted (low-light) production", yfmt:v=>v.toFixed(2),
+    series:[
+      {name:"Input-distribution drift (PSI)", color:"var(--ac-blue)", points:drift, width:2.4, dots:true, dotR:2},
+      {name:"Labelled accuracy (only exists ≥ d9)", color:"var(--bad)", points:acc, width:2.2, dashed:true, dots:true, dotR:2.4}
+    ],
+    hlines:[{y:0.20, color:"var(--warn)", label:"PSI alert 0.20"}],
+    vlines:[{x:3, color:"var(--ok)", label:"fires d3", dashed:false},
+            {x:9, color:"var(--ink-3)", label:"labels land d9", dashed:true}]
+  });
+}
+
+document.getElementById("cand-select").addEventListener("change", e=>{ candKey=e.target.value; drawGate(); });
+
+function render(){ drawGate(); drawShadow(); drawMonitor(); }
+AC.renderAll(render);
+AC.onThemeChange(render);
+</script>
+</body>
+</html>

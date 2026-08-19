@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Error Analysis Report &amp; Three Hypotheses · Day 4 Task 2</title>
+<meta name="description" content="Reference demo: the engineering-manager report and three pre-registered hypotheses — a cost-optimal threshold that needs no new data, per-class operating points, one hypothesis run with McNemar, and the review-volume arithmetic that decides whether the threshold is even available.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../index.html"><span class="logo">AC</span><span>Advanced AI Engineering<small>Demo Gallery</small></span></a>
+    <span class="spacer"></span>
+    <nav>
+      <a href="../index.html">◂ All demos</a>
+      <a href="task3.html">Next: The MLOps Pipeline ▸</a>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">☾</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div class="crumbs"><a href="../index.html">Gallery</a> › Day 4 · Vision, MLOps &amp; Feedback Loops › Task 2</div>
+    <div class="tags">
+      <span class="badge b-blue">Day 4 · Task 2</span>
+      <span class="badge">Lab 2</span>
+      <span class="badge tag-mods">MODULE 2 · COST-OPTIMAL THRESHOLD · PER-CLASS OPERATING POINTS · MCNEMAR · REVIEW CAPACITY</span>
+    </div>
+    <h1>Error Analysis Report &amp; Three Hypotheses</h1>
+    <p class="tagline">The cost-optimal threshold needs <strong>no new data, no labels and no training run</strong> — and on
+      many industrial systems it is the largest single available gain, and the one teams check last. But it is only
+      <em>available</em> if the review volume it creates fits inside real capacity.</p>
+  </div>
+
+  <!-- ---------------------------------------------------------- scenario -->
+  <section class="section" data-reveal>
+    <h2>The scenario</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <p>Produce the report you would hand your engineering manager, and the three hypotheses you would ask them to fund.
+           Then — because this is a build, not a document — <strong>run one of the three and report whether it held</strong>,
+           including if it under-delivered.</p>
+        <p style="margin-bottom:0">The report leads with the Task 1 label audit, because that is the line that turns an argument
+           about model quality into a finding about <em>process</em> quality — and it comes with a number.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:.6rem">The cost basis <span class="note-sim">(placeholders — Finance owns the real numbers)</span></h3>
+        <dl class="kv">
+          <dt>False reject</dt><dd>€ 45 · a scrapped good part</dd>
+          <dt>Escape</dt><dd>€ 1,900 · a missed crack reaching the customer</dd>
+          <dt>Ratio</dt><dd>≈ 42× — asymmetry drives the threshold low</dd>
+          <dt>Line rate</dt><dd>2 parts / second</dd>
+          <dt>Prevalence</dt><dd>≈ 4% defect in production</dd>
+          <dt>Reviewer capacity</dt><dd>2 offline stations · ~30 s / review</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- what to build -->
+  <section class="section" data-reveal>
+    <h2>What the attendees must build</h2>
+    <ul class="checklist grid-2 grid">
+      <li>A seven-section report scaffold, <b>led by the label-audit finding</b>, each section carrying a number</li>
+      <li>A cost curve — total expected cost vs decision threshold — with the <b>cost-optimal point marked</b> and the saving quantified</li>
+      <li>An interactive threshold that updates expected cost, false-reject count, escape count and deferral rate live</li>
+      <li><b>Per-class operating points</b> — one model, two thresholds — with the € saving over a single global threshold</li>
+      <li>Three hypotheses with a <b>measurable claim, a test and a pass criterion set in advance</b></li>
+      <li>One hypothesis executed with <b>McNemar</b>, effect size + interval, and <b>per-slice reporting</b> — even if it fails</li>
+      <li>Review-volume arithmetic against a <b>stated capacity</b> — the check most teams do after choosing the threshold</li>
+      <li>At least one honest under-delivery, stated plainly: a report where everything worked is a report nobody believes</li>
+    </ul>
+  </section>
+
+  <!-- ---------------------------------------------------------- THE REPORT -->
+  <section class="section" data-reveal>
+    <h2>The live error-analysis report</h2>
+
+    <!-- 7-section scaffold -->
+    <div class="card">
+      <div class="chart-title">The report, seven sections — led by the label audit</div>
+      <div class="chart-sub">Each section is a finding with a number, not a paragraph. An engineering manager should read one page and know what to fund.</div>
+      <div id="report-scaffold" style="margin-top:.8rem"></div>
+    </div>
+
+    <!-- cost curve -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">The cost curve — total expected cost vs decision threshold</div>
+          <div class="chart-sub">Sweep the operating point on held-out data. The optimum is not 0.5: an escape costs 42× a false reject, so the model should reject aggressively. No retraining involved.</div>
+        </div>
+        <div class="control" style="min-width:280px">
+          <label>Decision threshold · reject if P(crack) ≥ <span class="readout" id="t-read">0.45</span></label>
+          <input type="range" id="t-slider" min="0.20" max="0.80" step="0.01" value="0.45">
+        </div>
+      </div>
+      <div class="grid grid-4 keep2" style="margin-bottom:1rem">
+        <div class="metric accent-blue"><div class="label">Expected cost / shift</div><div class="value" id="m-cost">€ 785k</div><div class="sub" id="m-cost-sub">−€86k vs global 0.5</div></div>
+        <div class="metric"><div class="label">False rejects / shift</div><div class="value sm" id="m-fr">9,815</div><div class="sub">good parts scrapped · €45 each</div></div>
+        <div class="metric accent-bad"><div class="label">Escapes / shift</div><div class="value sm" id="m-esc">181</div><div class="sub">missed cracks · €1,900 each</div></div>
+        <div class="metric accent-warn"><div class="label">Deferral rate</div><div class="value sm" id="m-def">12.0%</div><div class="sub" id="m-def-sub">→ 8,640 reviews / shift</div></div>
+      </div>
+      <div id="cost-chart"></div>
+    </div>
+
+    <!-- per-class thresholds -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">Per-class operating points — one model, two thresholds</div>
+          <div class="chart-sub">The idea most teams have not considered: a safety-critical class set to favour recall, a cosmetic class set to favour precision. No retraining; it usually pays for the afternoon.</div>
+        </div>
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <div class="chart-sub">Expected cost / shift by threshold policy</div>
+          <div id="policy-chart"></div>
+        </div>
+        <div>
+          <div class="table-wrap" style="margin-top:.2rem">
+            <table class="data">
+              <thead><tr><th>Class</th><th class="num">Threshold</th><th>Favours</th><th class="num">Cost/shift</th></tr></thead>
+              <tbody>
+                <tr><td>Global (single point)</td><td class="num">0.45</td><td>balance</td><td class="num">€ 785k</td></tr>
+                <tr><td>Structural crack (safety)</td><td class="num">0.31</td><td class="muted">recall</td><td class="num">€ 731k</td></tr>
+                <tr><td>Surface / cosmetic</td><td class="num">0.62</td><td class="muted">precision</td><td class="num">€ 731k</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="small" style="margin:.7rem 0 0">Splitting the operating point by class trims a further <b>€ 54k / shift</b> over the single cost-optimal threshold — the safety-critical class recalls harder, the cosmetic class stops scrapping good parts. Same weights, same features, zero training runs.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- three hypotheses -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="chart-title">Three hypotheses — pre-registered, with a pass criterion set in advance</div>
+      <div class="chart-sub">A measurable claim, the test chosen before the run, and the bar it must clear. Committed to a file before anything executes — exactly the Day 1 apparatus.</div>
+      <div class="table-wrap" style="margin-top:.7rem">
+        <table class="data">
+          <thead><tr><th>Observed failure</th><th>Measurable hypothesis</th><th>Test</th><th>Pass criterion</th></tr></thead>
+          <tbody>
+            <tr><td>Recall poor on small defects</td><td>Tiling at 2× overlap raises small-defect recall</td><td>McNemar · small-defect subset</td><td class="num">0.52 → ≥ 0.70</td></tr>
+            <tr><td>Two classes confused</td><td>Re-labelling under a revised guideline raises per-class recall</td><td>Paired McNemar · fixed held-out</td><td class="num">≥ +0.06 both</td></tr>
+            <tr><td>False rejects too costly</td><td>Threshold at the cost-optimal point cuts total error cost</td><td>Cost curve · held-out</td><td class="num">≥ −30%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- run one hypothesis: re-labelling, McNemar, under-delivers -->
+    <div class="card" style="margin-top:1.1rem">
+      <div id="hyp-verdict" class="verdict v-warn" style="margin-bottom:1rem">
+        <span class="dot d-warn"></span>
+        <div>
+          <div class="vt">H2 · RE-LABELLING — statistically significant, but it UNDER-DELIVERS on its pre-registered bar</div>
+          <div class="vs">McNemar χ² = 10.9, p = 0.001 (real effect) — yet per-class gains of +0.041 and +0.052 both miss the pre-registered +0.06. Only part of the label noise sits near the decision boundary.</div>
+        </div>
+      </div>
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">Run one hypothesis properly — H2, re-labelling, with McNemar</div>
+          <div class="chart-sub">Both models scored on the same held-out images, each right or wrong per image — exactly McNemar's paired case. An unpaired test here is the most common statistical error in vision work.</div>
+        </div>
+      </div>
+      <div class="grid grid-3 keep2" style="margin-bottom:1rem">
+        <div class="metric"><div class="label">Discordant pairs</div><div class="value sm">b 41 · c 78</div><div class="sub">old-right/new-wrong · old-wrong/new-right</div></div>
+        <div class="metric accent-blue"><div class="label">McNemar</div><div class="value sm">χ² 10.9</div><div class="ci">p = 0.001 · significant</div></div>
+        <div class="metric accent-warn"><div class="label">Verdict vs criterion</div><div class="value sm">MISS</div><div class="sub">both classes below +0.06</div></div>
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <div class="chart-sub">Per-class recall gain from re-labelling, vs the pre-registered +0.06 bar</div>
+          <div id="hyp-chart"></div>
+          <p class="small" style="margin:.6rem 0 0">Significant is not the same as sufficient. The re-labelling helps, but the gain lands below the bar the team committed to <em>before</em> running — worth knowing before funding a full re-label programme.</p>
+        </div>
+        <div>
+          <div class="chart-sub">Per-slice reporting — an improvement that harms a rare critical slice is not an improvement</div>
+          <div class="table-wrap" style="margin-top:.2rem">
+            <table class="data">
+              <thead><tr><th>Slice</th><th class="num">Δ recall</th><th class="num">95% CI</th><th>Read</th></tr></thead>
+              <tbody>
+                <tr><td>Cracked (defect)</td><td class="num">+0.041</td><td class="num">[+0.012, +0.070]</td><td class="muted">below bar</td></tr>
+                <tr><td>Uncracked</td><td class="num">+0.052</td><td class="num">[+0.019, +0.085]</td><td class="muted">below bar</td></tr>
+                <tr><td>Low-contrast</td><td class="num">−0.010</td><td class="num">[−0.048, +0.028]</td><td class="muted">regressed</td></tr>
+                <tr><td>Small-defect</td><td class="num">+0.006</td><td class="num">[−0.031, +0.043]</td><td class="muted">flat</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- review arithmetic -->
+    <div class="card" style="margin-top:1.1rem">
+      <div id="review-verdict" class="verdict v-bad" style="margin-bottom:1rem">
+        <span class="dot d-bad"></span>
+        <div>
+          <div class="vt" id="rv-title">THRESHOLD UNAVAILABLE · the review volume does not fit capacity</div>
+          <div class="vs" id="rv-sub">At a 12% deferral the line produces ≈ 8,640 reviews/shift against a capacity of 2,400 — the cost curve is irrelevant until this fits.</div>
+        </div>
+      </div>
+      <div class="chart-title">The review-volume arithmetic — do it before choosing the threshold, not after</div>
+      <div class="chart-sub">Any threshold that defers uncertain cases to a person creates a workload. On a line at two parts per second the constraint is far tighter than for documents.</div>
+      <div class="grid grid-2" style="margin-top:.8rem">
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Quantity</th><th class="num">Value</th></tr></thead>
+            <tbody id="review-body"></tbody>
+          </table>
+        </div>
+        <div class="callout bad" style="margin:0">
+          <div class="k">Why it fails on day one</div>
+          <p style="margin:.3rem 0 0">Review must fit inside the 0.5-second cycle time or the part must be diverted to an offline station. At the cost-optimal operating point the deferral creates <b id="rv-reviews">8,640</b> reviews/shift — <b>3.6×</b> the two offline stations' capacity of <b>2,400</b>. A review design that exceeds capacity fails immediately, and the threshold that produces it <strong>is not available to you, whatever the cost curve says</strong>. Either raise the threshold (accept more escapes) or add offline review capacity — and put both on the same page as the cost saving.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- the trap -->
+  <section class="section" data-reveal>
+    <h2>The trap this report exists to close</h2>
+    <div class="callout bad">
+      <div class="k">Choosing the threshold before doing the arithmetic</div>
+      <p style="margin:.3rem 0 0">The cost curve says 0.45 and saves €86k/shift, so teams ship 0.45 — and discover on day one that it defers 8,600 parts to two review stations that can clear 2,400.
+        The saving was never real, because <strong>the operating point was never available</strong>. Do the review arithmetic first; the threshold you can actually run is the one whose deferral fits.</p>
+    </div>
+    <div class="callout warn">
+      <div class="k">An unpaired test on paired data</div>
+      <p style="margin:.3rem 0 0">Both models saw the same images, each right or wrong per image. That is McNemar's exact case. Comparing two accuracy figures with a two-sample proportion test throws away the pairing and
+        is the most common statistical error in vision work — it will call a real effect noise, or noise a real effect.</p>
+    </div>
+    <div class="callout">
+      <div class="k">The report where everything worked</div>
+      <p style="margin:.3rem 0 0">H2 is statistically significant and still misses its bar. Reporting only the win — "re-labelling helped, p&lt;0.01" — hides that most label noise sits away from the boundary and a full re-label would
+        under-return. A report in which every proposed change succeeded is a report nobody experienced believes.</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- lesson -->
+  <section class="section" data-reveal>
+    <div class="lesson">
+      <div class="k">The lesson this build makes undeniable</div>
+      <h3>A saving on a cost curve is a proposal, not a decision, until the arithmetic and the capacity agree.</h3>
+      <p style="margin-bottom:0">The cost-optimal threshold is free — no data, no labels, no training run — and it is often the biggest single gain on the table.
+        But "cost-optimal" and "available" are two different tests. The operating point you ship is the cheapest one whose <b>review volume fits real capacity</b>,
+        whose <b>per-slice</b> effects harm no critical class, and whose hypotheses were <b>pre-registered</b> so a miss is a finding rather than an excuse.</p>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="chart-title">Defend your result</div>
+      <p style="margin:.5rem 0 0;font-style:italic;color:var(--ink)">"The cost-optimal threshold saves <b>€ 86k</b> per shift against 0.5, with no retraining, and per-class
+        operating points add a further <b>€ 54k</b>. We pre-registered the re-labelling hypothesis and it <b>under-delivered</b> — significant at p=0.001 but +0.041/+0.052,
+        below our +0.06 bar. At that operating point we defer <b>12%</b>, which is <b>8,640</b> reviews per shift against a capacity of <b>2,400</b>, so the threshold is
+        <b>not available</b> until we add review stations or accept more escapes."</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- pagenav -->
+  <nav class="pagenav">
+    <a href="task1.html"><div class="pn"><small>◂ Day 4 · Task 1</small><b>Why Does the Model Fail?</b></div></a>
+    <a href="task3.html"><div class="pn next"><small>Next ▸ Day 4 · Task 3</small><b>The MLOps Pipeline, Built</b></div></a>
+  </nav>
+
+  <p class="note-sim" style="margin-top:2rem">All figures on this page are generated in your browser from a seeded simulator matching the Task 2 specification. No backend, no external calls. Cost, prevalence, capacity and effect-size figures are the illustrative placeholders from the task pack — every threshold moves when Finance supplies the real error costs.</p>
+
+</main>
+
+<footer class="footer"><div class="footer-inner"><div>Atlas Copco · Advanced AI Engineering Bootcamp — Reference Demo Gallery</div><div class="small">Day 4 · Task 2</div></div></footer>
+
+<script src="../assets/charts.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+/* ---- Report scaffold ----------------------------------------------------- */
+const SECTIONS = [
+  ["1","Label audit","LED","30% of reviewed failures were mislabels · κ 0.78 — the finding that changes the conversation", "b-warn"],
+  ["2","Failure taxonomy","","5 categories, counted, business-cost weighted: benign-shadow FPs & low-contrast FNs dominate", "b-info"],
+  ["3","Per-class breakdown","","Recall 0.847 cracked / 0.955 uncracked — the defect class carries the error", "b-info"],
+  ["4","Capture-condition analysis","","Low-light recall 0.79, −15 pts below the rest — a logged physical change", "b-info"],
+  ["5","Three hypotheses","","Tiling · re-labelling · threshold — each measurable, tested, pass criterion set in advance", "b-info"],
+  ["6","Threshold analysis","","Cost-optimal at 0.45 saves €86k/shift; per-class points add €54k — no retraining", "b-blue"],
+  ["7","Recommendation","","Fix labels + capture first; the threshold gain is real but capacity-limited today", "b-ok"]
+];
+document.getElementById("report-scaffold").innerHTML =
+  '<div class="grid grid-2" style="gap:.6rem">' + SECTIONS.map(s=>`
+    <div class="card" style="padding:.7rem .9rem;display:flex;gap:.7rem;align-items:flex-start;box-shadow:none">
+      <span class="badge ${s[4]}" style="flex:none">${s[1]}${s[2]?' · '+s[2]:''}</span>
+      <span style="font-size:.86rem;color:var(--ink-2)">${s[3]}</span>
+    </div>`).join('') + '</div>';
+
+/* ---- Seeded score simulator (held-out) ----------------------------------- */
+const PARTS_SHIFT = 72000, PREV = 0.04;
+const GOOD_SHIFT = PARTS_SHIFT*(1-PREV), DEF_SHIFT = PARTS_SHIFT*PREV;
+function clamp01(x){ return Math.max(0,Math.min(1,x)); }
+function sample(n, mean, sd, seed){ const r=AC.rng(seed); const a=[]; for(let i=0;i<n;i++) a.push(clamp01(mean+AC.gauss(r)*sd)); a.sort((x,y)=>x-y); return a; }
+const GOOD = sample(6000, 0.28, 0.15, 4201);   // good parts score low
+const DEF  = sample(6000, 0.70, 0.17, 4202);   // defect parts score high
+function fracGE(arr,t){ let lo=0,hi=arr.length; while(lo<hi){const m=(lo+hi)>>1; if(arr[m]<t) lo=m+1; else hi=m;} return (arr.length-lo)/arr.length; }
+function fracLT(arr,t){ return 1-fracGE(arr,t); }
+function fracBand(arr,t,w){ return fracGE(arr,t-w)-fracGE(arr,t+w); }
+const BAND = 0.043;
+
+function metrics(t){
+  const fr = GOOD_SHIFT*fracGE(GOOD,t);      // good parts rejected (false reject)
+  const esc = DEF_SHIFT*fracLT(DEF,t);       // defect parts passed (escape)
+  const cost = 45*fr + 1900*esc;
+  const defer = (1-PREV)*fracBand(GOOD,t,BAND) + PREV*fracBand(DEF,t,BAND);
+  return { fr, esc, cost, defer, reviews: defer*PARTS_SHIFT };
+}
+// cost-optimal
+let tStar=0.45, cStar=Infinity;
+for(let t=0.20; t<=0.80; t+=0.005){ const c=metrics(t).cost; if(c<cStar){cStar=c; tStar=+t.toFixed(3);} }
+const cGlobal = metrics(0.50).cost;
+
+let tSel = tStar;
+
+function drawCost(){
+  const pts=[]; for(let t=0.20; t<=0.80; t+=0.01) pts.push([t, metrics(t).cost/1000]);
+  AC.line(document.getElementById("cost-chart"), {
+    h:280, xmin:0.20, xmax:0.80, legend:false,
+    xticks:[{v:0.2,label:"0.20"},{v:0.35,label:"0.35"},{v:0.5,label:"0.50"},{v:0.65,label:"0.65"},{v:0.8,label:"0.80"}],
+    xlabel:"Decision threshold · P(crack)", yfmt:v=>"€"+v.toFixed(0)+"k",
+    series:[{name:"Expected cost / shift", color:"var(--ac-blue)", points:pts, width:2.4, area:true, fillOpacity:.10}],
+    vlines:[{x:0.5, color:"var(--ink-3)", label:"global 0.5", dashed:true},
+            {x:tSel, color:"var(--warn)", label:"selected "+tSel.toFixed(2), dashed:false, width:2}],
+    markers:[{x:tStar, y:cStar/1000, color:"var(--ok)", shape:"diamond", label:"optimal "+tStar.toFixed(2)}]
+  });
+}
+
+function updateThreshold(){
+  const m = metrics(tSel);
+  document.getElementById("t-read").textContent = tSel.toFixed(2);
+  document.getElementById("m-cost").textContent = "€ "+Math.round(m.cost/1000)+"k";
+  document.getElementById("m-cost-sub").textContent = (m.cost<=cGlobal? "−":"+")+"€"+Math.abs(Math.round((cGlobal-m.cost)/1000))+"k vs global 0.5";
+  document.getElementById("m-fr").textContent = Math.round(m.fr).toLocaleString("en-GB");
+  document.getElementById("m-esc").textContent = Math.round(m.esc).toLocaleString("en-GB");
+  document.getElementById("m-def").textContent = (m.defer*100).toFixed(1)+"%";
+  document.getElementById("m-def-sub").textContent = "→ "+Math.round(m.reviews).toLocaleString("en-GB")+" reviews / shift";
+  drawCost();
+  // review arithmetic table + verdict, driven live
+  const capacity = 2400;
+  const rows = [
+    ["Parts inspected / shift", PARTS_SHIFT.toLocaleString("en-GB")],
+    ["Line rate", "2 parts / second"],
+    ["Deferral at threshold "+tSel.toFixed(2), (m.defer*100).toFixed(1)+"%"],
+    ["Reviews required / shift", Math.round(m.reviews).toLocaleString("en-GB")],
+    ["Seconds available / review inline", "0.5 s (cycle time)"],
+    ["Offline reviewer capacity / shift", capacity.toLocaleString("en-GB")+" (2 stations · ~30 s)"],
+    ["Does it fit?", Math.round(m.reviews)<=capacity ? "yes" : "NO — divert or raise threshold"]
+  ];
+  document.getElementById("review-body").innerHTML = rows.map(r=>
+    `<tr><td>${r[0]}</td><td class="num">${r[1]}</td></tr>`).join("");
+  const fits = Math.round(m.reviews)<=capacity;
+  const v = document.getElementById("review-verdict");
+  v.className = "verdict "+(fits?"v-ok":"v-bad")+"";
+  v.querySelector(".dot").className = "dot "+(fits?"d-ok":"d-bad");
+  document.getElementById("rv-title").textContent = fits
+    ? "THRESHOLD AVAILABLE · the review volume fits capacity"
+    : "THRESHOLD UNAVAILABLE · the review volume does not fit capacity";
+  document.getElementById("rv-sub").textContent = fits
+    ? `At ${(m.defer*100).toFixed(1)}% deferral the line produces ${Math.round(m.reviews).toLocaleString("en-GB")} reviews/shift, within the ${capacity.toLocaleString("en-GB")} capacity.`
+    : `At ${(m.defer*100).toFixed(1)}% deferral the line produces ${Math.round(m.reviews).toLocaleString("en-GB")} reviews/shift against a capacity of ${capacity.toLocaleString("en-GB")} — the cost curve is irrelevant until this fits.`;
+  document.getElementById("rv-reviews").textContent = Math.round(m.reviews).toLocaleString("en-GB");
+}
+
+/* ---- static charts ------------------------------------------------------- */
+function drawStatic(){
+  // policy comparison
+  AC.bar(document.getElementById("policy-chart"), {
+    h:230, min:650, max:900, ticks:5, dp:0, vfmt:v=>"€"+v.toFixed(0)+"k",
+    data:[
+      {label:"Global 0.5", value:Math.round(cGlobal/1000), color:"var(--c7)"},
+      {label:"Single optimal", value:Math.round(cStar/1000), color:"var(--ac-blue)"},
+      {label:"Per-class", value:731, color:"var(--ok)"}
+    ]
+  });
+  // hypothesis per-class gain vs +0.06 bar (bar heights, colour = pass/fail)
+  AC.bar(document.getElementById("hyp-chart"), {
+    h:210, min:0, max:0.09, ticks:3, dp:3, vfmt:v=>"+"+v.toFixed(3),
+    data:[
+      {label:"Cracked +0.041", value:0.041, color:"var(--warn)"},
+      {label:"Uncracked +0.052", value:0.052, color:"var(--warn)"},
+      {label:"bar +0.060", value:0.060, color:"var(--ink-3)"}
+    ]
+  });
+}
+
+/* ---- wire ---------------------------------------------------------------- */
+document.getElementById("t-slider").addEventListener("input", e=>{ tSel=+e.target.value; updateThreshold(); });
+
+function render(){ drawStatic(); updateThreshold(); }
+AC.renderAll(render);
+AC.onThemeChange(render);
+</script>
+</body>
+</html>
