@@ -43,23 +43,31 @@ the live dashboard → the trap it exposes → the lesson → the sentence you d
 
 ## Deploy to the server
 
-Run from a machine that has SSH access to the target host:
+Run from a machine that has SSH access to the host (e.g. the Mac holding the SSH key / `~/.ssh/config`
+alias). All internal links are **relative**, so the site works served from a subpath or a docroot.
 
 ```bash
-./deploy.sh                             # defaults to root@103.216.171.67 → /var/www/atlas-demo
-./deploy.sh azureuser@103.216.171.67    # different SSH user
-./deploy.sh ubuntu@HOST /srv/www/demo   # different host / path
+./deploy.sh ragsys                      # copy via your ~/.ssh/config alias (non-destructive)
+./deploy.sh root@103.216.171.67         # or an explicit user@host
 ```
 
-The script copies the site (rsync, or scp/tar fallback), installs & configures nginx to serve it on
-port 80, and prints the URLs. After it runs:
+By **default the script is non-destructive**: it only copies the files, then prints the exact nginx
+`location` snippet to serve them at **`/atlas-demo/`** under your *existing* site — leaving your current
+vhost and TLS untouched. To let it wire nginx for you, pass a mode:
 
-- Common landing page: **`http://103.216.171.67/`**
-- Each task has its own link, e.g. `http://103.216.171.67/day1/task1.html`,
-  `http://103.216.171.67/day3/task2.html`, `http://103.216.171.67/day5/task4.html`.
+```bash
+FLAG=--location   ./deploy.sh ragsys    # adds /atlas-demo/ to your default server block + reloads
+FLAG=--standalone ./deploy.sh ragsys    # dedicated vhost that owns port 80 (fresh server only)
+```
 
-**No SSH?** The site is just static files — copy `demo-app/` to the server's web root by any means and
-point any web server at it. Fallbacks are documented at the bottom of `deploy.sh` (Python, Caddy, Docker).
+After deploy (subpath mode):
+
+- Common landing page: **`https://103.216.171.67/atlas-demo/`**
+- Each task has its own link, e.g. `…/atlas-demo/day1/task1.html`, `…/atlas-demo/day3/task2.html`,
+  `…/atlas-demo/day5/task4.html`.
+
+**No SSH from your machine?** The site is just static files — copy `demo-app/` to the server's web root
+by any means. Fallbacks (Python / Caddy / Docker) are documented at the bottom of `deploy.sh`.
 
 ## Develop / verify locally
 
