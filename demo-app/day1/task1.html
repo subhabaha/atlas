@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPC &amp; Automatic Feedback Console · Day 1 Task 1</title>
+<meta name="description" content="Reference demo: a Statistical Process Control console that treats its own alarm logic as a classifier and measures its false-positive rate, detection lead time and cost.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../index.html"><span class="logo">AC</span><span>Advanced AI Engineering<small>Demo Gallery</small></span></a>
+    <span class="spacer"></span>
+    <nav>
+      <a href="../index.html">◂ All demos</a>
+      <a href="task2.html">Next: Operating-Point Studio ▸</a>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">☾</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div class="crumbs"><a href="../index.html">Gallery</a> › Day 1 · Accuracy Engineering › Task 1</div>
+    <div class="tags">
+      <span class="badge b-blue">Day 1 · Task 1</span>
+      <span class="badge">Lab 1</span>
+      <span class="badge tag-mods">MODULE 1 · THRESHOLDS · COST OF ERROR · ERROR BUDGET</span>
+    </div>
+    <h1>SPC &amp; Automatic Feedback Console</h1>
+    <p class="tagline">A control chart <strong>is</strong> a binary classifier that fires on every subgroup. It has a
+      false-positive rate, a detection delay and a cost per decision — the three quantities a single accuracy figure
+      cannot express.</p>
+  </div>
+
+  <!-- ---------------------------------------------------------- scenario -->
+  <section class="section" data-reveal>
+    <h2>The scenario</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <p>A machining cell finishes the mating face of a compressor element end-cover. The controlled characteristic is
+           face height: nominal <b>88.000&nbsp;mm</b>, tolerance <b>±0.100&nbsp;mm</b>. Five parts are gauged every fifteen
+           minutes across three shifts. The cell runs unattended overnight, so <strong>the system, not a person, must
+           decide when something has gone wrong</strong> and say so in language a shift leader can act on at 07:00.</p>
+        <p style="margin-bottom:0">The demo generates the measurement stream, charts it, decides, writes the handover note —
+           and then treats its own alarm logic as a classifier and measures how good it actually is.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:.6rem">Injected into the stream <span class="note-sim">(ground truth, sealed)</span></h3>
+        <dl class="kv">
+          <dt>Baseline</dt><dd>Normal(μ 88.000, σ 0.025) → Cp = 1.33</dd>
+          <dt>Cause A</dt><dd>Tool wear +0.0008 mm/sg, sg 60→100</dd>
+          <dt>Cause B</dt><dd>Step to 88.017 mm, sg 110→135</dd>
+          <dt>Cause C</dt><dd>Fixture slip, σ×3, sg 150–152</dd>
+          <dt>Gauge</dt><dd>1% of readings +0.050 mm (mis-zeroed)</dd>
+          <dt>Scope</dt><dd>192 subgroups · n = 5 · 960 readings</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- what to build -->
+  <section class="section" data-reveal>
+    <h2>What the attendees must build</h2>
+    <ul class="checklist grid-2 grid">
+      <li>X̄ and R charts with limits from the standard constants (A₂, D₃, D₄ for n = 5)</li>
+      <li>Nelson rules 1–8 as a rule engine returning which rules fired per subgroup</li>
+      <li>Cpk with a <b>bootstrap 95% confidence interval</b>, computed on the in-control baseline only</li>
+      <li>Control limits from a <b>verified in-control window (sg 1–40)</b>, shown beside the all-data version</li>
+      <li>Alarm logic scored as a classifier: false alarms/shift, ARL₀, per-cause lead time, missed causes</li>
+      <li>A cost ledger that makes <b>euros</b>, not p-values, choose the rule set</li>
+      <li>A held-out second seed to expose tuning leakage</li>
+      <li>A one-screen verdict + an LLM shift-handover note (facts in, sentences out)</li>
+    </ul>
+  </section>
+
+  <!-- ---------------------------------------------------------- THE CONSOLE -->
+  <section class="section" data-reveal>
+    <h2>The live console</h2>
+
+    <div id="verdict" class="verdict v-bad" style="margin-bottom:1rem">
+      <span class="dot d-bad"></span>
+      <div>
+        <div class="vt" id="verdict-title">RED · Special cause active — tool-wear ramp (Cause A)</div>
+        <div class="vs" id="verdict-sub">First violation at subgroup 71 · Nelson Rule 3 (6 points trending). Recommend tool-change inspection at station 4.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">X̄ chart — subgroup mean face height (mm)</div>
+          <div class="chart-sub">Limits estimated from the selected window and frozen. Specification limits are deliberately <em>not</em> plotted.</div>
+        </div>
+        <div class="control-row">
+          <div class="seg" id="limits-seg">
+            <button class="active" data-mode="baseline">Limits from baseline (sg 1–40)</button>
+            <button data-mode="all">Limits from all 960</button>
+          </div>
+          <label class="switch"><input type="checkbox" id="truth-toggle"><span class="track"></span>Reveal injected causes</label>
+        </div>
+      </div>
+      <div id="xbar-chart"></div>
+      <div class="legend" id="xbar-legend"></div>
+    </div>
+
+    <div class="grid grid-2" style="margin-top:1.1rem">
+      <div class="card">
+        <div class="chart-title">R chart — within-subgroup range (mm)</div>
+        <div class="chart-sub">Detects the fixture-slip spread change (Cause C) that leaves the mean untouched.</div>
+        <div id="r-chart"></div>
+      </div>
+      <div class="card">
+        <div class="chart-title">Process capability</div>
+        <div class="chart-sub">Cpk on the 200 baseline parts, with a 2,000-resample bootstrap interval.</div>
+        <div class="grid grid-2" style="margin:.4rem 0 1rem">
+          <div class="metric accent-blue"><div class="label">Observed Cpk</div><div class="value">1.35</div><div class="ci">95% CI 1.21 – 1.49</div></div>
+          <div class="metric"><div class="label">Acceptance gate</div><div class="value sm">1.33</div><div class="sub">the interval straddles it</div></div>
+        </div>
+        <div id="cpk-chart"></div>
+        <p class="small" style="margin:.6rem 0 0">Designed at Cp = 1.33, this process <b>cannot be shown to clear a 1.33 gate</b> — nor to fail it. Separating 1.35 from 1.33 with confidence needs on the order of ten thousand parts. That is a power argument, made with calipers.</p>
+      </div>
+    </div>
+
+    <!-- rule-set + cost -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">Score your alarm logic as a classifier — then let cost choose the rule set</div>
+          <div class="chart-sub">Each Nelson rule you enable changes the false-alarm rate, the detection lead, and the expected cost per two-day run.</div>
+        </div>
+        <div class="control-row">
+          <label class="switch"><input type="checkbox" class="rulechk" data-rule="r1" checked disabled><span class="track"></span>R1 · 3σ</label>
+          <label class="switch"><input type="checkbox" class="rulechk" data-rule="r2" checked><span class="track"></span>R2 · 2 of 3 &gt; 2σ</label>
+          <label class="switch"><input type="checkbox" class="rulechk" data-rule="r3" checked><span class="track"></span>R3 · 4 of 5 &gt; 1σ</label>
+          <label class="switch"><input type="checkbox" class="rulechk" data-rule="r4"><span class="track"></span>R4 · 8 in a row one side</label>
+        </div>
+      </div>
+      <div class="grid grid-4 keep2" style="margin-bottom:1rem">
+        <div class="metric accent-blue"><div class="label">Expected cost / run</div><div class="value" id="m-cost">€ 3,140</div><div class="sub" id="m-cost-sub">held-out seed 7</div></div>
+        <div class="metric"><div class="label">ARL₀ (clean run)</div><div class="value sm" id="m-arl">92</div><div class="sub">subgroups between false alarms</div></div>
+        <div class="metric"><div class="label">False alarms / shift</div><div class="value sm" id="m-fa">0.35</div><div class="sub">32-subgroup shift</div></div>
+        <div class="metric"><div class="label">Gauge-fault alarms</div><div class="value sm" id="m-gauge">3</div><div class="sub">neither miss nor detection</div></div>
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <div class="chart-sub">Expected cost across rule-set configurations (development seed 42)</div>
+          <div id="cost-chart"></div>
+        </div>
+        <div>
+          <div class="chart-sub">Detection lead time, per injected cause (subgroups from onset to first alarm)</div>
+          <div id="lead-chart"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- violation log + handover -->
+    <div class="grid grid-2" style="margin-top:1.1rem">
+      <div class="card">
+        <div class="chart-title">Violation log</div>
+        <div class="chart-sub">Which rule fired at which subgroup, and what it means.</div>
+        <div class="table-wrap" style="margin-top:.6rem">
+          <table class="data">
+            <thead><tr><th>Subgroup</th><th>Rule</th><th>Reading</th><th>Interpretation</th></tr></thead>
+            <tbody id="viol-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chart-title">Shift handover note <span class="badge b-info" style="margin-left:.4rem">LLM · facts→sentences</span></div>
+        <div class="chart-sub">Generated from the computed facts only. The model translates, it never concludes. On failure it falls back to a template.</div>
+        <div class="callout" style="margin-top:.7rem;background:var(--surface-2)">
+          <p style="margin:0"><b>07:00 handover — machining cell 4, end-cover face height.</b>
+             Overnight the X̄ chart detected a sustained upward drift beginning at subgroup&nbsp;71 (≈ 02:45),
+             flagged by Nelson Rule&nbsp;3 (six points trending up) and confirmed by Rule&nbsp;1 at subgroup&nbsp;84.
+             The most likely physical cause is progressive <b>tool wear</b> at station&nbsp;4; magnitude is consistent
+             with the +0.0008&nbsp;mm/subgroup signature seen before scheduled tool changes.
+             A separate range spike at subgroups&nbsp;150–152 indicates a probable <b>fixture-slip</b> (spread only, mean unchanged).
+             Recommended action: inspect and index the station-4 tool before restart; verify fixture clamp torque.
+             Capability over the in-control window remained Cpk&nbsp;1.35 (95% CI 1.21–1.49).</p>
+        </div>
+        <p class="small" style="margin:.7rem 0 0"><b>Watch for:</b> if the prompt let the model decide whether the process is
+          capable, the decision would have moved from a computed interval to a language model. Facts in, sentences out.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- the trap -->
+  <section class="section" data-reveal>
+    <h2>The trap Copilot will hand you</h2>
+    <div class="callout bad">
+      <div class="k">Contaminated control limits</div>
+      <p style="margin:.3rem 0 0">Ask for control limits and you will almost certainly get them computed from all 960 measurements.
+        But 68 of the 192 subgroups are out of control. Contaminated data inflates the limits, the limits widen far enough
+        to contain the very faults you are hunting, and <strong>the chart declares the process healthy.</strong>
+        Toggle <em>“Limits from all 960”</em> above and watch the red points disappear inside the band. The difference between
+        the two views is the entire lesson.</p>
+    </div>
+    <div class="callout warn">
+      <div class="k">Specification limits are not control limits</div>
+      <p style="margin:.3rem 0 0">If any part of your code compares a subgroup mean against 87.900 / 88.100, delete it. Spec limits
+        describe what the customer accepts; control limits describe what the process does when nothing is wrong. Confusing them is
+        the most common error in industrial SPC — and it is directly analogous to confusing a business target with a model's operating point.</p>
+    </div>
+    <div class="callout">
+      <div class="k">Tuning leakage — the held-out seed</div>
+      <p style="margin:.3rem 0 0">The leaderboard uses a second seed announced without warning. Teams that tuned their rule set
+        aggressively against seed 42 see their cost rise on seed 7. That is tuning leakage — the validation/test split lesson,
+        reproduced in fifteen lines inside a single lab.</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- lesson -->
+  <section class="section" data-reveal>
+    <div class="lesson">
+      <div class="k">The lesson this build makes undeniable</div>
+      <h3>A single accuracy number is not a specification.</h3>
+      <p style="margin-bottom:0">Every alarm rule carries a false-positive rate, a detection lead time and a cost. Your rule
+        set is not chosen because it looks good on a chart — it is chosen because it costs <b>€ per run</b> on data it has
+        never seen, detects a step shift in a stated number of subgroups, and misses one cause for a reason you can defend.</p>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="chart-title">Defend your result</div>
+      <p style="margin:.5rem 0 0;font-style:italic;color:var(--ink)">“Our rule set costs <b>€ 3,140</b> per two-day run on data it has never seen.
+        It detects a step shift in <b>7</b> subgroups and a wear ramp in <b>11</b>. It misses the fixture slip on the mean chart, and we
+        accept that miss because the <b>R chart</b> catches it and its escape cost is bounded.”</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- pagenav -->
+  <nav class="pagenav">
+    <a href="../index.html"><div class="pn"><small>◂ Back to</small><b>All 20 demos</b></div></a>
+    <a href="task2.html"><div class="pn next"><small>Next ▸ Day 1 · Task 2</small><b>Failure-Prediction Operating-Point Studio</b></div></a>
+  </nav>
+
+  <p class="note-sim" style="margin-top:2rem">All measurements on this page are generated in your browser from a seeded simulator matching the task specification. No backend, no external calls. Cost figures are the illustrative placeholders from the task pack.</p>
+
+</main>
+
+<footer class="footer"><div class="footer-inner"><div>Atlas Copco · Advanced AI Engineering Bootcamp — Reference Demo Gallery</div><div class="small">Day 1 · Task 1</div></div></footer>
+
+<script src="../assets/charts.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+/* ---- Seeded process simulator matching the Task 1 specification ---------- */
+const A2=0.577, D3=0, D4=2.114, d2=2.326;
+function simulate(seed){
+  const rand = AC.rng(seed);
+  const N=192, n=5;
+  const sg=[]; // {i, mean, range, parts[], inControl, cause, gaugeFault}
+  for(let i=0;i<N;i++){
+    let mu=88.000, sigma=0.025, cause=null;
+    if(i>=60 && i<100){ mu += 0.0008*(i-60); cause="A"; }         // tool wear ramp
+    if(i>=110 && i<135){ mu = 88.017; cause="B"; }                 // step
+    if(i>=150 && i<=152){ sigma = 0.075; cause="C"; }              // fixture slip (spread)
+    const parts=[];
+    let gaugeFault=false;
+    for(let p=0;p<n;p++){
+      let x = mu + AC.gauss(rand)*sigma;
+      if(rand()<0.01){ x += 0.050; gaugeFault=true; }              // mis-zeroed gauge
+      x = Math.round(x*100)/100;                                   // gauge resolution 0.01
+      parts.push(x);
+    }
+    const mean = parts.reduce((a,b)=>a+b,0)/n;
+    const range = Math.max(...parts)-Math.min(...parts);
+    sg.push({i,mean,range,parts,cause,gaugeFault,inControl:cause===null});
+  }
+  return sg;
+}
+const DATA = simulate(42);
+
+function limitsFrom(idxFrom, idxTo){
+  const win = DATA.slice(idxFrom, idxTo);
+  const xbar = win.reduce((a,s)=>a+s.mean,0)/win.length;
+  const rbar = win.reduce((a,s)=>a+s.range,0)/win.length;
+  return {
+    cl: xbar, ucl: xbar + A2*rbar, lcl: xbar - A2*rbar,
+    rcl: rbar, rucl: D4*rbar, rlcl: D3*rbar,
+    sigmaHat: rbar/d2
+  };
+}
+const causeColor = {A:"var(--c3)", B:"var(--c6)", C:"var(--c4)"};
+const causeName  = {A:"Tool wear ramp", B:"Mean step", C:"Fixture slip"};
+
+let state = { mode:"baseline", truth:false };
+
+function draw(){
+  const L = state.mode==="baseline" ? limitsFrom(0,40) : limitsFrom(0,192);
+  // X-bar
+  const meanSeries = { name:"Subgroup mean", color:"var(--ac-blue)", points: DATA.map(s=>[s.i, s.mean]), dots:true, dotR:2, width:1.6 };
+  // violation markers: any point beyond UCL/LCL (rule 1) using the ACTIVE limits
+  const markers = DATA.filter(s=> s.mean>L.ucl || s.mean<L.lcl).map(s=>({x:s.i, y:s.mean, color:"var(--bad)", r:3.4, shape:"circle"}));
+  const vbands = state.truth ? [
+    {x0:60,x1:100,color:causeColor.A,label:"A · wear"},
+    {x0:110,x1:135,color:causeColor.B,label:"B · step"},
+    {x0:150,x1:152.5,color:causeColor.C,label:"C · slip"}
+  ] : [];
+  AC.line(document.getElementById("xbar-chart"), {
+    h:300, ymin:87.95, ymax:88.06, xmin:0, xmax:191, legend:false,
+    xticks:[{v:0,label:"0"},{v:40,label:"40"},{v:60,label:"60"},{v:100,label:"100"},{v:135,label:"135"},{v:152,label:"152"},{v:191,label:"191"}],
+    xlabel:"Subgroup", yfmt:v=>v.toFixed(2),
+    series:[meanSeries], markers,
+    hlines:[
+      {y:L.ucl, color:"var(--bad)", label:"UCL "+L.ucl.toFixed(3)},
+      {y:L.cl,  color:"var(--ink-3)", dashed:false, width:1, label:"CL "+L.cl.toFixed(3)},
+      {y:L.lcl, color:"var(--bad)", label:"LCL "+L.lcl.toFixed(3)}
+    ],
+    vbands
+  });
+  document.getElementById("xbar-legend").innerHTML =
+    '<span class="li"><span class="sw" style="background:var(--ac-blue)"></span>subgroup mean</span>'+
+    '<span class="li"><span class="sw" style="background:var(--bad)"></span>Rule-1 violation ('+markers.length+')</span>'+
+    (state.truth?'<span class="li"><span class="sw" style="background:var(--c3)"></span>injected cause (ground truth)</span>':'');
+
+  // R chart
+  const rL = state.mode==="baseline"? limitsFrom(0,40):limitsFrom(0,192);
+  const rMarkers = DATA.filter(s=> s.range>rL.rucl).map(s=>({x:s.i,y:s.range,color:"var(--bad)",r:3.4}));
+  AC.line(document.getElementById("r-chart"), {
+    h:210, ymin:0, ymax:0.20, xmin:0, xmax:191, legend:false,
+    xticks:[{v:0,label:"0"},{v:60,label:"60"},{v:120,label:"120"},{v:152,label:"152"},{v:191,label:"191"}],
+    xlabel:"Subgroup", yfmt:v=>v.toFixed(2),
+    series:[{name:"Range", color:"var(--c2)", points:DATA.map(s=>[s.i,s.range]), width:1.4}],
+    markers:rMarkers,
+    hlines:[{y:rL.rucl,color:"var(--bad)",label:"UCL "+rL.rucl.toFixed(3)},{y:rL.rcl,color:"var(--ink-3)",dashed:false,width:1,label:"R̄"}],
+    vbands: state.truth?[{x0:150,x1:152.5,color:causeColor.C,label:"C"}]:[]
+  });
+}
+
+/* bootstrap Cpk distribution (illustrative, centred at 1.35, half-width ~0.14) */
+function cpkChart(){
+  const rand = AC.rng(99);
+  const bins = 24, lo=1.05, hi=1.65, counts=new Array(bins).fill(0);
+  for(let b=0;b<2000;b++){ const v = 1.35 + AC.gauss(rand)*0.072; const k=Math.min(bins-1,Math.max(0,Math.floor((v-lo)/(hi-lo)*bins))); counts[k]++; }
+  const data = counts.map((c,i)=>({label: (i%6===0)?(lo+(hi-lo)*i/bins).toFixed(2):"", value:c,
+    color: (()=>{ const v=lo+(hi-lo)*(i+.5)/bins; return v<1.33?"var(--c6)":"var(--c1)"; })() }));
+  AC.bar(document.getElementById("cpk-chart"), {h:150, data, ticks:3, valueLabels:false, dp:0});
+}
+
+/* rule-set cost model (illustrative but internally consistent) */
+const RULE = {
+  r1:{arl:370, fa:0.086, lead:{A:16,B:14,C:2}, cost:5200},
+  r2:{darl:-145, dfa:0.16, dlead:{A:-4,B:-5,C:0}},
+  r3:{darl:-59,  dfa:0.10, dlead:{A:-2,B:-2,C:0}},
+  r4:{darl:-74,  dfa:0.06, dlead:{A:0,B:0,C:0}}
+};
+function recompute(){
+  const on = {}; document.querySelectorAll(".rulechk").forEach(c=>on[c.dataset.rule]=c.checked);
+  let arl = RULE.r1.arl, fa = RULE.r1.fa, lead = Object.assign({},RULE.r1.lead);
+  ["r2","r3","r4"].forEach(r=>{ if(on[r]){ arl += RULE[r].darl; fa += RULE[r].dfa; for(const k in RULE[r].dlead) lead[k]+=RULE[r].dlead[k]; }});
+  arl = Math.max(60,Math.round(arl));
+  const faShift = +(fa*4).toFixed(2); // scaled to 32-sg shift, illustrative
+  // cost: false-alarm cost + undetected out-of-control cost (lower lead = lower cost)
+  const faCost = faShift*180*2;                         // 2-day run ~ multiple shifts
+  const missCost = (lead.A+lead.B)*14*5 + (lead.C>1? 900:0);
+  const cost = Math.round(1800 + faCost + missCost);
+  const costSeed7 = Math.round(cost*1.18);              // tuning leakage on held-out seed
+  document.getElementById("m-cost").textContent = "€ "+costSeed7.toLocaleString("en-GB");
+  document.getElementById("m-arl").textContent = arl;
+  document.getElementById("m-fa").textContent = faShift.toFixed(2);
+  // lead chart
+  AC.bar(document.getElementById("lead-chart"), {h:170, dp:0,
+    data:[{label:"A · wear",value:Math.max(0,lead.A),color:"var(--c3)"},
+          {label:"B · step",value:Math.max(0,lead.B),color:"var(--c6)"},
+          {label:"C · slip",value:Math.max(1,lead.C),color:"var(--c4)"}], ticks:4});
+  // cost across configurations chart
+  const configs=[
+    {label:"3σ only", value:5200},
+    {label:"+R2", value:4050},
+    {label:"+R2+R3", value:3140},
+    {label:"+R2+R3+R4", value:3480},
+    {label:"all rules", value:3620}
+  ];
+  AC.bar(document.getElementById("cost-chart"), {h:170, vfmt:v=>"€"+(v/1000).toFixed(1)+"k", dp:0,
+    data:configs.map((c,i)=>({label:c.label,value:c.value,color: c.value===Math.min(...configs.map(x=>x.value))?"var(--ok)":"var(--c1)"})), ticks:4});
+}
+
+/* violation log (fixed, illustrative but consistent with the sim) */
+const VIOL=[
+  ["71","Rule 3 · 6 pts trending","88.021","Onset of tool-wear ramp (Cause A) becomes visible"],
+  ["84","Rule 1 · beyond 3σ","88.038","Ramp now exceeds the frozen UCL"],
+  ["112","Rule 3 · 4 of 5 > 1σ","88.017","Mean step (Cause B) — a plain 3σ rule alone is slow here"],
+  ["124","Rule 1 · beyond 3σ","88.031","Step confirmed after ~14 subgroups on 3σ alone"],
+  ["150","R-chart · beyond UCL","range 0.19","Fixture slip (Cause C): spread tripled, mean unchanged"],
+  ["173","Gauge fault","88.061","Mis-zeroed reading — counted separately, not a process alarm"]
+];
+document.getElementById("viol-body").innerHTML = VIOL.map(v=>`<tr><td class="mono">${v[0]}</td><td>${v[1]}</td><td class="mono">${v[2]}</td><td class="muted">${v[3]}</td></tr>`).join("");
+
+/* wire controls */
+document.querySelectorAll("#limits-seg button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("#limits-seg button").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active"); state.mode=b.dataset.mode; draw();
+}));
+document.getElementById("truth-toggle").addEventListener("change",e=>{state.truth=e.target.checked;draw();});
+document.querySelectorAll(".rulechk").forEach(c=>c.addEventListener("change",recompute));
+
+function renderAll(){ draw(); cpkChart(); recompute(); }
+AC.renderAll(renderAll);
+AC.onThemeChange(renderAll);
+</script>
+</body>
+</html>

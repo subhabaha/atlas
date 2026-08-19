@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About · Atlas Copco AI Engineering Demo Gallery</title>
+<meta name="description" content="How to use the Atlas Copco Advanced AI Engineering demo gallery — what each reference demo shows and how it maps to the five-day task packs.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html"><span class="logo">AC</span><span>Advanced AI Engineering<small>Demo Gallery</small></span></a>
+    <span class="spacer"></span>
+    <nav>
+      <a href="index.html">◂ All demos</a>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">☾</button>
+  </div>
+</header>
+
+<main class="wrap wrap-narrow">
+
+  <div class="page-head">
+    <div class="crumbs"><a href="index.html">Gallery</a> › About</div>
+    <h1>How to use this gallery</h1>
+    <p class="tagline">One interactive reference demo for every hands-on task in the five-day Advanced AI Engineering bootcamp — so that when an attendee asks <em>“what am I actually expected to build?”</em>, you can open a link and show them.</p>
+  </div>
+
+  <section class="section">
+    <h2>What this is</h2>
+    <p>The programme runs <strong>five days × four hands-on tasks = twenty builds</strong>. Each task in the participant
+       handbooks ends with a running dashboard and a one-screen verdict the team defends aloud. This gallery contains a
+       <strong>worked reference</strong> for each of those twenty deliverables: the scenario, what must be built, an
+       interactive dashboard populated with realistic data, the trap the task is designed to expose, the measurement that
+       settles it, and the sentence a team would defend.</p>
+    <div class="callout">
+      <div class="k">The one rule behind all twenty</div>
+      <p style="margin:.3rem 0 0">You are not scored on whether your model is good. You are scored on whether you can
+        <strong>prove what your system does and does not do</strong> — with a number, an interval, and a stated cost.
+        A team that reports 0.62 recall with an honest confidence interval and a cost-justified threshold beats a team
+        that reports 0.99 accuracy, every single time.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>How each demo is structured</h2>
+    <div class="grid grid-2">
+      <div class="card"><h3>1 · The scenario</h3><p style="margin:0">The industrial situation, framed in Atlas Copco terms — compressor elements, installed-base service, field engineers — with the exact dataset and figures from the task pack.</p></div>
+      <div class="card"><h3>2 · What you must build</h3><p style="margin:0">The task's acceptance criteria, as a checklist — the concrete deliverables an attendee is graded on.</p></div>
+      <div class="card"><h3>3 · The live dashboard</h3><p style="margin:0">The centrepiece: an interactive version of the exact deliverable, with the charts, metrics, intervals and controls the task asks for.</p></div>
+      <div class="card"><h3>4 · The trap &amp; the lesson</h3><p style="margin:0">The planted defect the task exists to expose — leakage, contaminated limits, a silent retrieval failure — and the single sentence it makes undeniable.</p></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>The five days at a glance</h2>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Day</th><th>Theme</th><th>The four builds</th></tr></thead>
+        <tbody>
+          <tr><td><b>1</b></td><td>Accuracy Engineering</td><td>SPC console · operating-point studio · failure taxonomy · production-readiness review</td></tr>
+          <tr><td><b>2</b></td><td>Architecture, Data &amp; Security</td><td>pattern-selection bench · the 19 layers · ingestion architecture · secure retrieval</td></tr>
+          <tr><td><b>3</b></td><td>RAG, MCP &amp; Observability</td><td>ingestion bench · retrieval benchmark · three MCP servers · pipeline ablation</td></tr>
+          <tr><td><b>4</b></td><td>Vision, MLOps &amp; Feedback</td><td>failure diagnosis · error analysis · MLOps pipeline · feedback loop</td></tr>
+          <tr><td><b>5</b></td><td>Agents, Skills &amp; Guardrails</td><td>field-service agents · reusable Skill · attack &amp; defend · the capstone</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>A note on the data</h2>
+    <p>Every figure on every page is <strong>public, synthetic, or illustrative</strong>, generated in your browser from a
+       seeded simulator or drawn from the public datasets the task packs reference (AI4I 2020, MetroPT-3, MaintIE, the DOE
+       Fundamentals Handbooks, the surface-crack image set). <strong>No Atlas Copco production data is used anywhere.</strong>
+       All cost figures — €180 for a line stop, €9,500 for an unplanned stoppage, and the rest — are the illustrative
+       placeholders from the task packs. The demos run entirely offline: no backend, no external calls.</p>
+    <div class="callout ok">
+      <div class="k">Use it live</div>
+      <p style="margin:.3rem 0 0">Open a task from the <a href="index.html">gallery</a>, project it, and toggle the controls —
+        move a threshold, reveal the ground truth, switch the control limits, push a worse model through the gate. The point
+        the task makes is most convincing when the room watches the number change.</p>
+    </div>
+  </section>
+
+  <nav class="pagenav">
+    <a href="index.html"><div class="pn"><small>◂ Back to</small><b>All 20 demos</b></div></a>
+    <a href="day1/task1.html"><div class="pn next"><small>Start with ▸ Day 1 · Task 1</small><b>SPC &amp; Automatic Feedback Console</b></div></a>
+  </nav>
+
+</main>
+
+<footer class="footer"><div class="footer-inner"><div>Atlas Copco · Advanced AI Engineering Bootcamp — Reference Demo Gallery</div><div class="small">About</div></div></footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>
