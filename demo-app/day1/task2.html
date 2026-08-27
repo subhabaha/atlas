@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Failure-Prediction Operating-Point Studio · Day 1 Task 2</title>
+<meta name="description" content="Reference demo: 99% accuracy with near-zero recall. A class-imbalance, leakage and alarm-fatigue studio that turns a predictive-maintenance model into an operating point defended in alerts per engineer per day.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../index.html"><span class="logo">AC</span><span>Advanced AI Engineering<small>Demo Gallery</small></span></a>
+    <span class="spacer"></span>
+    <nav>
+      <a href="../index.html">◂ All demos</a>
+      <a href="task3.html">Next: Failure Taxonomy Console ▸</a>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">☾</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div class="crumbs"><a href="../index.html">Gallery</a> › Day 1 · Accuracy Engineering › Task 2</div>
+    <div class="tags">
+      <span class="badge b-blue">Day 1 · Task 2</span>
+      <span class="badge">Lab 2</span>
+      <span class="badge tag-mods">MODULE 2A · CLASS IMBALANCE · LEAKAGE · BOOTSTRAP CI · ALARM FATIGUE</span>
+    </div>
+    <h1>Failure-Prediction Operating-Point Studio</h1>
+    <p class="tagline">A model can be <strong>99% accurate</strong> and prevent nothing. Class imbalance, target leakage and a finite
+      number of engineers turn "accuracy" into a decision the business cannot use — until you re-express it as an operating point
+      in <strong>alerts per engineer per day</strong>, with an interval on every number.</p>
+  </div>
+
+  <!-- ---------------------------------------------------------- scenario -->
+  <section class="section" data-reveal>
+    <h2>The scenario</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <p>Atlas Copco has roughly <b>1,200 installed machines</b> under a service contract, each scored once an hour by a
+           failure-prediction service. <b>Six field service engineers</b> cover the region. Your team has been handed a model that
+           reports very high accuracy and asked one question: <strong>can we switch it on?</strong></p>
+        <p style="margin-bottom:0">By the end of this lab you have an answer, a number, an interval on that number, and an
+           operating point defended in <b>alerts per engineer per day</b> — not a leaderboard accuracy.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:.6rem">The data <span class="note-sim">(AI4I 2020, UCI #601)</span></h3>
+        <dl class="kv">
+          <dt>Rows</dt><dd>10,000 × 14 columns</dd>
+          <dt>Label</dt><dd>Machine failure · ~3.4% positive</dd>
+          <dt>Test split</dt><dd>30% stratified → ~102 failures</dd>
+          <dt>Sensors</dt><dd>air/proc temp, rpm, torque, tool-wear, grade</dd>
+          <dt>Mode cols</dt><dd>TWF · HDF · PWF · OSF · RNF</dd>
+          <dt>Deploy prior</dt><dd>π = 0.17% (≈2 degradations/day)</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- what to build -->
+  <section class="section" data-reveal>
+    <h2>What the attendees must build</h2>
+    <ul class="checklist grid-2 grid">
+      <li>The trivial "never predict failure" baseline — accuracy in large type, left there all session</li>
+      <li>Honest vs <b>leaking</b> model side by side, permanently labelled, leakage explained in one sentence</li>
+      <li>Confusion matrix for the honest model at the 0.5 threshold (accuracy high, recall embarrassing)</li>
+      <li>Recall gain from <b>3 derived physics features</b> vs gain from switching model family</li>
+      <li>A <b>bootstrap 95% interval</b> on recall <em>everywhere</em> recall appears (~100 positives → noisy)</li>
+      <li>The alarm-budget arithmetic, with precision quoted at the <b>deployment prior</b>, not the training prior</li>
+      <li>An operating-point studio: PR curve, threshold slider, live alert volume, live cost</li>
+      <li>A ground-truth audit — label vs OR-of-modes disagreements, and the irreducible RNF subset excluded</li>
+    </ul>
+  </section>
+
+  <!-- ---------------------------------------------------------- THE STUDIO -->
+  <section class="section" data-reveal>
+    <h2>The live studio</h2>
+
+    <!-- trivial baseline banner -->
+    <div class="card card-pad-lg" style="background:linear-gradient(135deg,color-mix(in srgb,var(--bad) 12%,var(--surface)),var(--surface));border-color:color-mix(in srgb,var(--bad) 30%,var(--border));margin-bottom:1.1rem">
+      <div class="badge b-bad" style="margin-bottom:.5rem">The dishonest baseline · leave it on screen</div>
+      <div style="font-family:var(--mono);font-weight:800;font-size:clamp(1.5rem,4vw,2.5rem);line-height:1.12;color:var(--ink)">
+        96.6% accurate · predicted <span style="color:var(--bad)">0</span> failures · prevented <span style="color:var(--bad)">nothing</span></div>
+      <p style="margin:.6rem 0 0;max-width:80ch">"Our system is 96.6% accurate, has never once predicted a failure, and would have prevented nothing."
+        Everything below is an argument against that number. On a 3.4%-positive label, predicting the majority class scores
+        <b>96.6%</b> and is worthless — accuracy is not a specification.</p>
+    </div>
+
+    <!-- honest vs leaking -->
+    <div class="card">
+      <div class="chart-title">Honest model vs leaking model — shown together, permanently</div>
+      <div class="chart-sub">The leaking model adds the five failure-mode columns (TWF/HDF/PWF/OSF/RNF). Those are not predictors —
+        <b>they are the failure, recorded at the moment it happened.</b> <code>Machine failure</code> is their logical OR. In production
+        they do not exist at prediction time; they are written afterwards by the engineer. Target leakage, everywhere.</div>
+      <div class="grid grid-2" style="margin-top:.9rem">
+        <div>
+          <div class="badge b-bad" style="margin-bottom:.6rem">Leaking · with TWF/HDF/PWF/OSF/RNF</div>
+          <div class="grid grid-2 keep2">
+            <div class="metric accent-bad"><div class="label">Accuracy</div><div class="value sm">0.994</div><div class="sub">"perfect", and a lie</div></div>
+            <div class="metric accent-bad"><div class="label">Recall</div><div class="value sm">0.990</div><div class="ci">it memorised the answer</div></div>
+            <div class="metric"><div class="label">Precision</div><div class="value sm">0.985</div><div class="sub">at prediction time these<br>columns are all zero</div></div>
+            <div class="metric"><div class="label">AUC</div><div class="value sm">0.999</div><div class="sub">collapses in production</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="badge b-ok" style="margin-bottom:.6rem">Honest · sensors only, threshold 0.5</div>
+          <div class="grid grid-2 keep2">
+            <div class="metric accent-blue"><div class="label">Accuracy</div><div class="value sm">0.971</div><div class="sub">barely beats the trivial 0.966</div></div>
+            <div class="metric accent-warn"><div class="label">Recall</div><div class="value sm" id="h-recall05">0.52</div><div class="ci" id="h-recall05-ci">95% CI 0.42 – 0.62</div></div>
+            <div class="metric"><div class="label">Precision</div><div class="value sm" id="h-prec05">0.63</div><div class="sub">on the 3.4% test prior</div></div>
+            <div class="metric"><div class="label">F1 (failure)</div><div class="value sm">0.57</div><div class="sub">the number that embarrasses</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-2" style="margin-top:1.1rem">
+        <div>
+          <div class="chart-sub">Honest-model confusion matrix — test set, threshold 0.5 (~102 failures)</div>
+          <div id="cm-chart"></div>
+        </div>
+        <div>
+          <div class="chart-sub">Why the leaking model is a mirror, not a model</div>
+          <div class="callout bad" style="margin-top:0">
+            <div class="k">The single most valuable screen you build today</div>
+            <p style="margin:.3rem 0 0">Ask at what moment each value becomes known. The five mode columns are written
+              <em>after</em> the machine failed, in the service report. "Parts issued from stores", "work-order closed",
+              "downtime hours" — every one is a consequence of the failure sitting in the database looking exactly like a feature.
+              The leaking model scores 0.99 on everything and detects nothing you did not already know.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- feature engineering vs model family -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="chart-title">Feature representation beats model choice</div>
+      <div class="chart-sub">Recall gain (at 0.5) from three physics-derived features — mechanical power (τ·2π·rpm/60),
+        temperature difference (proc − air), overstrain product (wear·τ) — versus the gain from swapping logistic regression for a
+        gradient-boosted tree. Three lines of arithmetic from process knowledge win, and usually by a wide margin.</div>
+      <div class="grid grid-2" style="margin-top:.6rem">
+        <div id="feat-chart"></div>
+        <div>
+          <div class="grid grid-2 keep2">
+            <div class="metric accent-ok"><div class="label">Gain · derived features</div><div class="value sm">+0.19</div><div class="ci">recall 0.52 → 0.71</div></div>
+            <div class="metric"><div class="label">Gain · model family</div><div class="value sm">+0.05</div><div class="sub">LR → GBT</div></div>
+          </div>
+          <p class="small" style="margin:.8rem 0 0">"Get more data" and "try a bigger model" are the two most expensive wrong
+            answers in industrial AI. The power-failure mode is <em>defined</em> by power leaving a band; hand the model power and it
+            stops guessing. This is the data-centric argument produced by your own hands, not asserted from a slide.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- alarm budget -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="chart-title">The alarm budget — the constraint that decides everything</div>
+      <div class="chart-sub">First correct the prior: the benchmark is 3.4% positive, but a real installed base develops roughly
+        <b>two dispatch-worthy degradations per day</b> across 1,200 machines — <b>π = 0.17%</b>, twenty times rarer. This is label
+        shift. The model's ranking transfers; its probabilities and every threshold on them do not.</div>
+      <div class="grid grid-2" style="margin-top:.7rem">
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Quantity</th><th class="num">Value</th></tr></thead>
+            <tbody>
+              <tr><td>Predictions / day (fleet × daily scoring)</td><td class="num">1,200</td></tr>
+              <tr><td>Genuine degradations / day <span class="muted">(π = 0.17%)</span></td><td class="num">≈ 2</td></tr>
+              <tr><td>Alerts the org will read / day <span class="muted">(6 × 5)</span></td><td class="num">30</td></tr>
+              <tr><td>False alerts the budget allows <span class="muted">(30 − 2·recall)</span></td><td class="num">≈ 28</td></tr>
+              <tr><td>Max tolerable false-positive rate <span class="muted">(28 / 1,198)</span></td><td class="num">≤ 2.3%</td></tr>
+              <tr><td><b>Best achievable precision at full budget</b> <span class="muted">(2 / 30)</span></td><td class="num"><b>≈ 6.7%</b></td></tr>
+            </tbody>
+          </table>
+          <p class="small" style="margin:.7rem .2rem 0">Corrected precision: <span class="mono">TPR·π / (TPR·π + FPR·(1−π))</span>,
+            with <b>π = 0.0017</b>, not 0.034. Quoting the training prior overstates precision by more than an order of magnitude.</p>
+        </div>
+        <div class="card" style="display:flex;flex-direction:column;justify-content:center;background:var(--surface-2)">
+          <div class="badge b-warn" style="align-self:flex-start;margin-bottom:.6rem">Put this on screen in large type</div>
+          <div style="font-family:var(--mono);font-weight:800;font-size:clamp(1.3rem,3vw,2rem);line-height:1.2;color:var(--ink)">
+            14 of every 15 alerts an engineer opens will be nothing.</div>
+          <p style="margin:.7rem 0 0">Even a <em>perfect</em> model — catching every degradation, at the maximum volume this
+            organisation can absorb — hits precision ≈ 6.7%. That is not a modelling failure. It is arithmetic, forced by a rare event
+            and a finite number of engineers. No amount of accuracy escapes it.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- operating point studio -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">Operating-point studio</div>
+          <div class="chart-sub">Precision–recall with the operating point marked at FPR ≤ 2.3%. Move the threshold and watch the
+            deployment reality update live: alerts per engineer per day, recall (with its bootstrap interval), precision at π = 0.17%,
+            and expected cost.</div>
+        </div>
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <div class="chart-sub">PR curve · honest model on the test set · ◆ = budget operating point (FPR 2.3%)</div>
+          <div id="pr-chart"></div>
+        </div>
+        <div>
+          <div class="control" style="min-width:100%;margin-bottom:1rem">
+            <label>Decision threshold · <span class="readout" id="thr-read">0.50</span></label>
+            <input type="range" id="thr" min="2" max="98" value="50" step="1">
+          </div>
+          <div class="grid grid-2 keep2">
+            <div class="metric accent-blue"><div class="label">Alerts / engineer / day</div><div class="value" id="m-alerts">4.9</div><div class="sub" id="m-alerts-sub">ceiling is 5 · fleet 1,200</div></div>
+            <div class="metric accent-warn"><div class="label">Recall (degradations caught)</div><div class="value sm" id="m-recall">52%</div><div class="ci" id="m-recall-ci">95% CI 42 – 62%</div></div>
+            <div class="metric"><div class="label">Precision @ π = 0.17%</div><div class="value sm" id="m-prec">6.4%</div><div class="sub" id="m-prec-sub">deployment prior, not 0.034</div></div>
+            <div class="metric"><div class="label">Expected cost / day</div><div class="value sm" id="m-cost">€ 21,400</div><div class="sub" id="m-cost-sub">FPR <span id="m-fpr">2.3%</span></div></div>
+          </div>
+          <div class="callout" style="margin-top:1rem" id="op-note">
+            <div class="k">At the budget operating point</div>
+            <p style="margin:.3rem 0 0" id="op-note-body">Holding FPR at the 2.3% the organisation can absorb, the honest model detects
+              about <b>48%</b> of degradations (95% CI 38–58%). The cost-optimal threshold sits lower and would demand far more than
+              five alerts per engineer — so the honest deliverable is a triage step that dismisses an alert from the desk for
+              <b>€ 35</b> instead of dispatching an engineer for <b>€ 700</b>, not a lower threshold.</p>
+          </div>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:1rem">
+        <table class="data">
+          <thead><tr><th>Cost input</th><th class="num">Value</th><th>When it applies</th></tr></thead>
+          <tbody>
+            <tr><td>Unplanned stoppage on a customer installation</td><td class="num">€ 9,500</td><td class="muted">a genuine degradation is missed</td></tr>
+            <tr><td>Planned intervention, warning correct</td><td class="num">€ 1,200</td><td class="muted">a genuine degradation is caught</td></tr>
+            <tr><td>Engineer dispatched, nothing found</td><td class="num">€ 700</td><td class="muted">a false alert acted on</td></tr>
+            <tr><td>Alert reviewed and dismissed from the desk</td><td class="num">€ 35</td><td class="muted">a false alert triaged, not dispatched</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ground truth audit -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="chart-title">Ground-truth audit — the hard ceiling nobody checked</div>
+      <div class="chart-sub">Two checks, four lines of pandas. This is a public benchmark cited in hundreds of papers; the ceiling was
+        sitting in the first four lines of the file.</div>
+      <div class="grid grid-3 keep2" style="margin-top:.7rem">
+        <div class="metric accent-bad"><div class="label">Label ≠ OR-of-modes</div><div class="value">9</div><div class="sub">rows labelled failure where every mode column is 0 — weak ground truth</div></div>
+        <div class="metric accent-warn"><div class="label">RNF rows (random)</div><div class="value">19</div><div class="sub">aleatoric — unrelated to any sensor, excluded from the improvement target</div></div>
+        <div class="metric"><div class="label">Consistency ceiling</div><div class="value sm">≤ label</div><div class="sub">no model can be more consistent than the labels it learns from</div></div>
+      </div>
+      <p class="small" style="margin:.9rem 0 0">The label and the mode columns do not agree, and the RNF count does not match the
+        documentation. <b>RNF is a random failure</b> generated at a fixed probability, unrelated to any feature — more data will not
+        help, a bigger model will not help. The correct engineering response is to quantify it, <b>exclude it from the improvement
+        target</b>, and stop spending money on it.</p>
+    </div>
+
+    <!-- verdict -->
+    <div class="verdict v-warn" style="margin-top:1.1rem">
+      <span class="dot d-warn"></span>
+      <div>
+        <div class="vt">SWITCH ON — but as a ranked worklist behind a €35 desk-triage step, not as an auto-dispatcher</div>
+        <div class="vs">At five alerts/engineer/day we catch ~48% of degradations (95% CI 38–58%), and ~1 in 15 alerts is real.
+          The leaking model's 99% is an artefact of columns that do not exist at prediction time. The largest honest gain came from
+          derived features, not the model family. Ship it to <b>rank</b> machines; let a human dismiss for €35 rather than dispatch for €700.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- the trap -->
+  <section class="section" data-reveal>
+    <h2>The traps this studio exposes</h2>
+    <div class="callout bad">
+      <div class="k">Accuracy on an imbalanced label</div>
+      <p style="margin:.3rem 0 0">96.6% accuracy is what you get for predicting "no failure" forever. Any accuracy figure quoted on a
+        3.4%-positive label without a confusion matrix beside it is a number engineered to impress a room that has not read the base rate.</p>
+    </div>
+    <div class="callout warn">
+      <div class="k">The prior you trained on is not the prior you deploy into</div>
+      <p style="margin:.3rem 0 0">The training set is 3.4% positive; the installed base is 0.17%. Quote precision at the training prior
+        and you overstate it twenty-fold. Recompute precision at π = 0.0017 before you say a single number to the business — the model's
+        ranking transfers, its probabilities do not.</p>
+    </div>
+    <div class="callout">
+      <div class="k">Recall without an interval does not place</div>
+      <p style="margin:.3rem 0 0">The test split holds ~100 failures. Recall computed on 100 positives is noisy; a point estimate hides
+        that. Bootstrap the test set 2,000 times and carry the 95% interval everywhere recall appears — including on the slider above,
+        which recomputes it live.</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- lesson -->
+  <section class="section" data-reveal>
+    <div class="lesson">
+      <div class="k">The lesson this build makes undeniable</div>
+      <h3>The deliverable is an operating point, not an accuracy.</h3>
+      <p style="margin-bottom:0">A model's value is decided by a rare event, a finite number of engineers, and the cost of each error —
+        not by a leaderboard. The honest answer is a sentence in the units the business acts on: <b>alerts per engineer per day</b>,
+        recall with an interval, precision at the deployment prior, and a triage step that dismisses for €35 rather than dispatches for €700.</p>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="chart-title">Defend your result</div>
+      <p style="margin:.5rem 0 0;font-style:italic;color:var(--ink)">"At five alerts per engineer per day we catch <b>~48%</b> of
+        degradations, 95% CI <b>38% to 58%</b>, and <b>1 in 15</b> alerts is a real one. The leaking model claimed <b>99%</b> — from
+        columns that do not exist at prediction time. The largest honest gain came from <b>three derived physics features (+0.19 recall)</b>,
+        not the model. We recommend switching it on as a ranked worklist behind a €35 desk-triage step, because at this fleet size and prior
+        no threshold makes it an auto-dispatcher."</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- pagenav -->
+  <nav class="pagenav">
+    <a href="task1.html"><div class="pn"><small>◂ Prev · Day 1 · Task 1</small><b>SPC &amp; Automatic Feedback Console</b></div></a>
+    <a href="task3.html"><div class="pn next"><small>Next ▸ Day 1 · Task 3</small><b>Failure Taxonomy &amp; Hypothesis Backlog Console</b></div></a>
+  </nav>
+
+  <p class="note-sim" style="margin-top:2rem">All figures on this page are generated in your browser from a seeded simulator of the
+    AI4I 2020 test split. No backend, no external calls. Cost figures are the illustrative placeholders from the task pack.</p>
+
+</main>
+
+<footer class="footer"><div class="footer-inner"><div>Atlas Copco · Advanced AI Engineering Bootcamp — Reference Demo Gallery</div><div class="small">Day 1 · Task 2</div></div></footer>
+
+<script src="../assets/charts.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+/* ---- Seeded synthetic AI4I test split ------------------------------------ */
+/* Honest model: score in [0,1]. Negatives concentrated low, positives overlap
+   so that recall at 0.5 is an embarrassing ~0.52. */
+const N_TEST = 3000;
+const sigmoid = z => 1/(1+Math.exp(-z));
+function buildTest(seed){
+  const rand = AC.rng(seed);
+  const neg=[], pos=[];
+  for(let i=0;i<N_TEST;i++){
+    const isPos = rand() < 0.034;
+    if(isPos){ pos.push(sigmoid(-0.10 + AC.gauss(rand)*1.35)); }     // mean logit ~ -0.1
+    else     { neg.push(sigmoid(-3.25 + AC.gauss(rand)*1.05)); }     // mostly tiny scores
+  }
+  return {neg, pos};
+}
+const TEST = buildTest(601);
+const P = TEST.pos.length, Ng = TEST.neg.length;   // ~102 positives, ~2898 negatives
+
+function recallAt(t){ return TEST.pos.filter(s=>s>=t).length / P; }
+function fprAt(t){ return TEST.neg.filter(s=>s>=t).length / Ng; }
+function precisionTestPrior(t){
+  const tp = TEST.pos.filter(s=>s>=t).length, fp = TEST.neg.filter(s=>s>=t).length;
+  return tp+fp ? tp/(tp+fp) : 0;
+}
+/* bootstrap recall CI at threshold t (resample the positive scores) */
+function bootRecallCI(t, iters){
+  iters = iters||600;
+  const rand = AC.rng(4242 + Math.round(t*1000));
+  const arr = TEST.pos, n = arr.length, out = [];
+  for(let b=0;b<iters;b++){
+    let hit=0;
+    for(let i=0;i<n;i++){ if(arr[(rand()*n)|0] >= t) hit++; }
+    out.push(hit/n);
+  }
+  out.sort((a,b)=>a-b);
+  return [out[Math.floor(iters*0.025)], out[Math.floor(iters*0.975)]];
+}
+/* precision at deployment prior */
+function precisionDeploy(tpr, fpr){
+  const pi = 0.0017;
+  const num = tpr*pi;
+  return num / (num + fpr*(1-pi)) || 0;
+}
+/* threshold that yields FPR closest to 2.3% (the budget operating point) */
+let OP_T = 0.5, best = 1e9;
+for(let t=0.02;t<=0.99;t+=0.005){ const d=Math.abs(fprAt(t)-0.023); if(d<best){best=d;OP_T=t;} }
+
+/* ---- rendering ----------------------------------------------------------- */
+function cmChart(){
+  const t=0.5;
+  const tp=TEST.pos.filter(s=>s>=t).length, fn=P-tp;
+  const fp=TEST.neg.filter(s=>s>=t).length, tn=Ng-fp;
+  AC.heatmap(document.getElementById("cm-chart"), {
+    matrix:[[tn,fp],[fn,tp]],
+    rows:["Actual OK","Actual FAIL"], cols:["Pred OK","Pred FAIL"],
+    cell:96, lblL:96, lblT:30, fmt:v=>v.toLocaleString("en-GB"),
+    cellColor:(v,r,c)=>{
+      const good = (r===0&&c===0)||(r===1&&c===1);
+      const base = good? AC.cssVar("--ok"):AC.cssVar("--bad");
+      const max = Math.max(tn,fp,fn,tp);
+      return AC.mix(AC.cssVar("--surface-2"), base, Math.pow(v/max,.55));
+    }
+  });
+}
+function featChart(){
+  AC.bar(document.getElementById("feat-chart"), {h:230, ticks:4, dp:2, vfmt:v=>"+"+v.toFixed(2),
+    data:[
+      {label:"Model family (LR→GBT)", value:0.05, color:"var(--c7)"},
+      {label:"Derived features (×3)", value:0.19, color:"var(--c5)"}
+    ], max:0.24});
+}
+function prChart(){
+  const pts=[];
+  for(let t=0.02;t<=0.99;t+=0.01){ pts.push([recallAt(t), precisionTestPrior(t)]); }
+  pts.sort((a,b)=>a[0]-b[0]);
+  const opR = recallAt(OP_T), opP = precisionTestPrior(OP_T);
+  AC.line(document.getElementById("pr-chart"), {
+    h:280, xmin:0, xmax:1, ymin:0, ymax:1, legend:false,
+    xticks:[{v:0,label:"0"},{v:0.25,label:".25"},{v:0.5,label:".5"},{v:0.75,label:".75"},{v:1,label:"1"}],
+    xlabel:"Recall (failure class)", yfmt:v=>v.toFixed(1),
+    series:[{name:"PR", color:"var(--ac-blue)", points:pts, width:2.2, area:true, fillOpacity:.10}],
+    markers:[{x:opR, y:opP, color:"var(--c4)", shape:"diamond", label:"FPR 2.3%"},
+             {x:recallAt(0.5), y:precisionTestPrior(0.5), color:"var(--warn)", shape:"circle", r:4, label:"t=0.5"}]
+  });
+}
+
+/* live threshold panel */
+function updateThreshold(){
+  const t = document.getElementById("thr").value/100;
+  document.getElementById("thr-read").textContent = t.toFixed(2);
+  const tpr = recallAt(t), fpr = fprAt(t);
+  const ci = bootRecallCI(t, 500);
+  // alerts/day = 2 true (×recall caught) + FPR × 1198 negatives-per-day ; per engineer /6
+  const alertsDay = 2*tpr + fpr*1198;
+  const perEng = alertsDay/6;
+  const precD = precisionDeploy(tpr,fpr);
+  // expected cost/day: caught €1200, missed €9500 (of 2/day); false alerts dispatched €700
+  const falseAlerts = fpr*1198;
+  const cost = 2*(tpr*1200 + (1-tpr)*9500) + falseAlerts*700;
+  document.getElementById("m-alerts").textContent = perEng.toFixed(1);
+  document.getElementById("m-alerts-sub").textContent = (alertsDay).toFixed(0)+" alerts/day · ceiling 30";
+  document.getElementById("m-recall").textContent = Math.round(tpr*100)+"%";
+  document.getElementById("m-recall-ci").textContent = "95% CI "+Math.round(ci[0]*100)+" – "+Math.round(ci[1]*100)+"%";
+  document.getElementById("m-prec").textContent = (precD*100).toFixed(1)+"%";
+  document.getElementById("m-cost").textContent = "€ "+Math.round(cost).toLocaleString("en-GB");
+  document.getElementById("m-fpr").textContent = (fpr*100).toFixed(1)+"%";
+  // highlight budget breach
+  const tile = document.getElementById("m-alerts");
+  tile.parentElement.className = "metric " + (perEng>5 ? "accent-bad" : "accent-blue");
+}
+
+function render(){
+  cmChart(); featChart(); prChart();
+  // static honest@0.5 tiles reflect the simulated data
+  const r05 = recallAt(0.5), ci05 = bootRecallCI(0.5, 800), p05 = precisionTestPrior(0.5);
+  document.getElementById("h-recall05").textContent = r05.toFixed(2);
+  document.getElementById("h-recall05-ci").textContent = "95% CI "+ci05[0].toFixed(2)+" – "+ci05[1].toFixed(2);
+  document.getElementById("h-prec05").textContent = p05.toFixed(2);
+  // operating-point note recall
+  const opR = recallAt(OP_T), opci = bootRecallCI(OP_T, 800);
+  document.getElementById("op-note-body").innerHTML =
+    'Holding FPR at the 2.3% the organisation can absorb, the honest model detects about <b>'+Math.round(opR*100)+'%</b> '+
+    'of degradations (95% CI '+Math.round(opci[0]*100)+'–'+Math.round(opci[1]*100)+'%). The cost-optimal threshold sits lower and '+
+    'would demand far more than five alerts per engineer — so the honest deliverable is a triage step that dismisses an alert from the '+
+    'desk for <b>€ 35</b> instead of dispatching an engineer for <b>€ 700</b>, not a lower threshold.';
+  updateThreshold();
+}
+
+document.getElementById("thr").addEventListener("input", updateThreshold);
+AC.renderAll(render);
+AC.onThemeChange(render);
+</script>
+</body>
+</html>

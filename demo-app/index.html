@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atlas Copco · Advanced AI Engineering — Demo Gallery</title>
+<meta name="description" content="Reference demo applications for all 20 hands-on tasks of the Atlas Copco Advanced AI Engineering Bootcamp — one working demo per task, showing exactly what each build is expected to deliver.">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">
+      <span class="logo">AC</span>
+      <span>Advanced AI Engineering<small>Demo Gallery · Reference Builds</small></span>
+    </a>
+    <span class="spacer"></span>
+    <nav>
+      <a href="#day1">Day 1</a>
+      <a href="#day2">Day 2</a>
+      <a href="#day3">Day 3</a>
+      <a href="#day4">Day 4</a>
+      <a href="#day5">Day 5</a>
+      <a href="about.html">About</a>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">☾</button>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="grid-overlay"></div>
+  <div class="hero-inner">
+    <span class="badge b-info" style="background:rgba(255,255,255,.16);color:#fff">Enterprise AI Engineering Bootcamp · 5 Days · 20 Builds</span>
+    <h1 style="margin-top:1rem">What each task is expected to deliver — running, not described.</h1>
+    <p>This gallery contains one interactive reference demo for every hands-on task in the five-day programme.
+       Each demo mirrors the dashboard the attendees are asked to build, populated with realistic data, so the
+       expectation is <strong>visible and self-explanatory</strong> — the concept, the trap it exposes, the
+       measurement that settles it, and the verdict a manager can act on.</p>
+    <div class="kbar">
+      <div class="k"><b>5</b><span>Days</span></div>
+      <div class="k"><b>20</b><span>Reference demos</span></div>
+      <div class="k"><b>4</b><span>Tasks per day</span></div>
+      <div class="k"><b>1</b><span>Rule: prove what it does</span></div>
+    </div>
+    <div style="margin-top:1.8rem;display:flex;gap:.8rem;flex-wrap:wrap">
+      <a class="btn btn-primary" href="#day1">Start with Day 1 →</a>
+      <a class="btn" style="background:rgba(255,255,255,.16);color:#fff" href="about.html">How to use this gallery</a>
+    </div>
+  </div>
+</section>
+
+<main class="wrap">
+
+  <div class="callout" data-reveal>
+    <div class="k">The thread that runs through all twenty</div>
+    <p style="margin:.3rem 0 0">You are not scored on whether your model is good. You are scored on whether you can
+       <strong>prove what your system does and does not do</strong> — with a number, an interval, and a stated cost.
+       Every demo below is built to make one such proof undeniable.</p>
+  </div>
+
+  <!-- ============================================================ DAY 1 -->
+  <div id="day1" class="day-head" data-reveal>
+    <span class="num">DAY 1</span>
+    <h2>Accuracy Engineering</h2>
+    <span class="theme">Thresholds · evaluation · uncertainty · error taxonomy · production-readiness</span>
+  </div>
+  <div class="grid grid-2">
+    <a class="task-card" href="day1/task1.html" data-reveal>
+      <span class="tnum">Day 1 · Task 1 · Lab 1</span>
+      <h3>SPC &amp; Automatic Feedback Console</h3>
+      <p class="tsub">A control chart <em>is</em> a classifier — with a false-positive rate, a detection lead time and a cost per decision. Build it, then score its own alarm logic.</p>
+      <div class="tmeta"><span class="badge b-blue">Control charts</span><span class="badge">Cpk + CI</span><span class="badge">Cost</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+    <a class="task-card" href="day1/task2.html" data-reveal>
+      <span class="tnum">Day 1 · Task 2 · Lab 2</span>
+      <h3>Failure-Prediction Operating-Point Studio</h3>
+      <p class="tsub">96.6% accurate and it never predicted a failure. Leakage, the deployment prior, and the alarm budget that decides everything.</p>
+      <div class="tmeta"><span class="badge b-blue">Imbalance</span><span class="badge">Leakage</span><span class="badge">PR curve</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+    <a class="task-card" href="day1/task3.html" data-reveal>
+      <span class="tnum">Day 1 · Task 3 · Lab 3</span>
+      <h3>Failure Taxonomy &amp; Hypothesis Backlog</h3>
+      <p class="tsub">Where four engineers disagree, no model can learn a boundary. Inter-annotator kappa, frequency-vs-cost Pareto, and a ranked backlog.</p>
+      <div class="tmeta"><span class="badge b-blue">Kappa</span><span class="badge">Pareto</span><span class="badge">Backlog</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+    <a class="task-card" href="day1/task4.html" data-reveal>
+      <span class="tnum">Day 1 · Task 4 · Assignment</span>
+      <h3>Production Readiness Review</h3>
+      <p class="tsub">Prove a change helped: pre-registration, McNemar, power, the peeking simulator, calibration, drift — and a defensible ship decision.</p>
+      <div class="tmeta"><span class="badge b-blue">McNemar</span><span class="badge">Power</span><span class="badge">Verdict</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+  </div>
+
+  <!-- ============================================================ DAY 2 -->
+  <div id="day2" class="day-head" data-reveal>
+    <span class="num">DAY 2</span>
+    <h2>Architecture, Data &amp; Security</h2>
+    <span class="theme">Pattern selection · the 19 layers · storage &amp; ingestion · secure retrieval</span>
+  </div>
+  <div class="grid grid-2">
+    <a class="task-card" href="day2/task1.html" data-reveal>
+      <span class="tnum">Day 2 · Task 1 · Lab 1</span>
+      <h3>Pattern Selection Bench</h3>
+      <p class="tsub">With four labelled failures you cannot train a supervised model — and cannot evaluate one. Anomaly detection asks a question the data can answer.</p>
+      <div class="tmeta"><span class="badge b-blue">ADR</span><span class="badge">Group leakage</span><span class="badge">Anomaly</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+    <a class="task-card" href="day2/task2.html" data-reveal>
+      <span class="tnum">Day 2 · Task 2 · Lab 2</span>
+      <h3>The Nineteen Layers</h3>
+      <p class="tsub">A PoC has three components; a production system has nineteen. Build the naive one, add the layers, then a chaos drill breaks your dependencies live.</p>
+      <div class="tmeta"><span class="badge b-blue">Layers</span><span class="badge">Chaos drill</span><span class="badge">Timeouts</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+    <a class="task-card" href="day2/task3.html" data-reveal>
+      <span class="tnum">Day 2 · Task 3 · Lab 3</span>
+      <h3>Ingestion Architecture</h3>
+      <p class="tsub">Eleven storage layers, data contracts that fail loudly, and the most expensive silent failure in enterprise retrieval: two embedding versions in one index.</p>
+      <div class="tmeta"><span class="badge b-blue">11 layers</span><span class="badge">Contracts</span><span class="badge">Embeddings</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+    <a class="task-card" href="day2/task4.html" data-reveal>
+      <span class="tnum">Day 2 · Task 4 · Lab 4</span>
+      <h3>Secure Retrieval, Three Roles</h3>
+      <p class="tsub">Retrieve-then-filter is not access control — the restricted content already shaped the answer. Filter inside the query, evaluate per role, hunt four leakage paths.</p>
+      <div class="tmeta"><span class="badge b-blue">RBAC</span><span class="badge">Filter-first</span><span class="badge">Red team</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+  </div>
+
+  <!-- ============================================================ DAY 3 -->
+  <div id="day3" class="day-head" data-reveal>
+    <span class="num">DAY 3</span>
+    <h2>Production-Grade RAG, MCP &amp; Observability</h2>
+    <span class="theme">Extraction &amp; chunking · retrieval strategies · MCP contracts · ablation &amp; traces</span>
+  </div>
+  <div class="grid grid-2">
+    <a class="task-card" href="day3/task1.html" data-reveal>
+      <span class="tnum">Day 3 · Task 1 · Labs 1–2</span>
+      <h3>The Ingestion Bench</h3>
+      <p class="tsub">Everything downstream is capped here. Four extraction levels, a torque table destroyed silently, and a safety procedure cut in half by a chunk boundary.</p>
+      <div class="tmeta"><span class="badge b-blue">Extraction</span><span class="badge">Chunking</span><span class="badge">Token budget</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+    <a class="task-card" href="day3/task2.html" data-reveal>
+      <span class="tnum">Day 3 · Task 2 · Lab 3</span>
+      <h3>Retrieval Strategy Benchmark</h3>
+      <p class="tsub">Dense fails on part numbers; sparse fails on paraphrase; neither failure is visible in the answer. Five strategies, one table, by question class.</p>
+      <div class="tmeta"><span class="badge b-blue">Dense/Sparse</span><span class="badge">RRF</span><span class="badge">Rerank</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+    <a class="task-card" href="day3/task3.html" data-reveal>
+      <span class="tnum">Day 3 · Task 3 · Lab 4</span>
+      <h3>Three MCP Servers</h3>
+      <p class="tsub">A vague tool description causes wrong calls that look like a model problem. The six-element contract, and the confused-deputy vulnerability, fixed.</p>
+      <div class="tmeta"><span class="badge b-blue">Contracts</span><span class="badge">Confused deputy</span><span class="badge">Egress</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+    <a class="task-card" href="day3/task4.html" data-reveal>
+      <span class="tnum">Day 3 · Task 4 · Labs 5–6</span>
+      <h3>Fix a Weak Pipeline, and Watch It</h3>
+      <p class="tsub">Eight metrics, eight-span traces, and an ablation of five changes — one at a time — that shows which change earned which part of the gain, and which earned nothing.</p>
+      <div class="tmeta"><span class="badge b-blue">Ablation</span><span class="badge">Traces</span><span class="badge">Observability</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+  </div>
+
+  <!-- ============================================================ DAY 4 -->
+  <div id="day4" class="day-head" data-reveal>
+    <span class="num">DAY 4</span>
+    <h2>Vision, MLOps &amp; Feedback Loops</h2>
+    <span class="theme">Failure diagnosis · cost-optimal thresholds · MLOps gate &amp; rollback · active learning</span>
+  </div>
+  <div class="grid grid-2">
+    <a class="task-card" href="day4/task1.html" data-reveal>
+      <span class="tnum">Day 4 · Task 1 · Lab 1</span>
+      <h3>Why Does the Model Fail?</h3>
+      <p class="tsub">Between 10% and 30% of your "model failures" are labelling failures — you cannot know which without looking. Per-class recall, the label audit, capture conditions.</p>
+      <div class="tmeta"><span class="badge b-blue">Label audit</span><span class="badge">Per-class</span><span class="badge">Kappa ceiling</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+    <a class="task-card" href="day4/task2.html" data-reveal>
+      <span class="tnum">Day 4 · Task 2 · Lab 2</span>
+      <h3>Error Analysis &amp; Three Hypotheses</h3>
+      <p class="tsub">The cost-optimal threshold needs no new data, no labels and no training run — and is often the largest single gain. Per-class operating points and the review-capacity ceiling.</p>
+      <div class="tmeta"><span class="badge b-blue">Cost curve</span><span class="badge">Per-class θ</span><span class="badge">Capacity</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+    <a class="task-card" href="day4/task3.html" data-reveal>
+      <span class="tnum">Day 4 · Task 3 · Lab 3</span>
+      <h3>The MLOps Pipeline, Built</h3>
+      <p class="tsub">Four versions bound to every run, an evaluation gate that actually rejects a worse model, a rollback timed with a stopwatch, and a drift monitor that fires without labels.</p>
+      <div class="tmeta"><span class="badge b-blue">Eval gate</span><span class="badge">Registry</span><span class="badge">Rollback</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+    <a class="task-card" href="day4/task4.html" data-reveal>
+      <span class="tnum">Day 4 · Task 4 · Lab 4</span>
+      <h3>The Feedback Loop, With Arithmetic</h3>
+      <p class="tsub">Calibrate first, then measure: labelling the cases the model finds hard beats labelling at random, by a wide margin. The learning curves prove the label saving.</p>
+      <div class="tmeta"><span class="badge b-blue">Calibration</span><span class="badge">Active learning</span><span class="badge">Capture schema</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+  </div>
+
+  <!-- ============================================================ DAY 5 -->
+  <div id="day5" class="day-head" data-reveal>
+    <span class="num">DAY 5</span>
+    <h2>Agents, Skills, Guardrails &amp; the Capstone</h2>
+    <span class="theme">Compounding error · reusable Skills · red-team &amp; controls-as-code · the roadmap</span>
+  </div>
+  <div class="grid grid-2">
+    <a class="task-card" href="day5/task1.html" data-reveal>
+      <span class="tnum">Day 5 · Task 1 · Labs 1–2</span>
+      <h3>The Field-Service Agent System</h3>
+      <p class="tsub">Autonomy multiplies error: 90% per step is 43% over eight. Six agents, per-step measurement, and the reliability gain from making it <em>less</em> agentic.</p>
+      <div class="tmeta"><span class="badge b-blue">Per-step</span><span class="badge">Contracts</span><span class="badge">Approval gate</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+    <a class="task-card" href="day5/task2.html" data-reveal>
+      <span class="tnum">Day 5 · Task 2 · Lab 3</span>
+      <h3>One Reusable Skill</h3>
+      <p class="tsub">A Skill without test cases is a shared prompt with ambitions. Eight components, a manifest, a failing test that blocks publication, and the adversarial case that proves you understand it.</p>
+      <div class="tmeta"><span class="badge b-blue">8 components</span><span class="badge">Test suite</span><span class="badge">Registry</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+    <a class="task-card" href="day5/task3.html" data-reveal>
+      <span class="tnum">Day 5 · Task 3 · Lab 4</span>
+      <h3>Attack Your Own System, Then Defend It</h3>
+      <p class="tsub">A guardrail written as a prompt instruction is a request; written as code it is a control. Six attack classes, triage, and controls put where controls go.</p>
+      <div class="tmeta"><span class="badge b-blue">Red team</span><span class="badge">Injection</span><span class="badge">Controls-as-code</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+    <a class="task-card" href="day5/task4.html" data-reveal>
+      <span class="tnum">Day 5 · Task 4 · Capstone</span>
+      <h3>The Capstone</h3>
+      <p class="tsub">Assembly, not new work: eighteen items, sixteen already built. The improvement roadmap with an honest ceiling, and a 30/60/90-day plan that starts with measurement.</p>
+      <div class="tmeta"><span class="badge b-blue">18 items</span><span class="badge">Roadmap</span><span class="badge">30/60/90</span></div>
+      <span class="go">Open demo →</span>
+    </a>
+  </div>
+
+  <hr class="hr">
+  <div class="card card-pad-lg" data-reveal style="text-align:center">
+    <h2 style="justify-content:center">Every demo follows the same honest structure</h2>
+    <p class="lead" style="margin:.4rem auto 1.4rem">The scenario · what you must build · the working dashboard · the trap it exposes · the measurement that settles it · the sentence you defend aloud.</p>
+    <div class="pill-row" style="justify-content:center">
+      <span class="chip">📊 Interactive charts</span>
+      <span class="chip">🎯 Realistic synthetic data</span>
+      <span class="chip">🧭 Self-explanatory</span>
+      <span class="chip">🌗 Light &amp; dark</span>
+      <span class="chip">⚡ Runs offline, no backend</span>
+    </div>
+  </div>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div>Atlas Copco · Advanced AI Engineering Bootcamp — Reference Demo Gallery.<br>
+      <span class="small">Data is public, synthetic or illustrative throughout. No Atlas Copco production data is used. Cost figures are placeholders.</span></div>
+    <div class="small">Built for demonstration of expected task deliverables.</div>
+  </div>
+</footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

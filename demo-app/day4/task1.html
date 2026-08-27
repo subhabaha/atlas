@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why Does the Model Fail? · Day 4 Task 1</title>
+<meta name="description" content="Reference demo: diagnose a surface-crack inspection model before improving it — per-class recall beside accuracy, a looked-at failure grid, a label audit with Cohen's kappa, and the one constraint that is actually limiting you.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../index.html"><span class="logo">AC</span><span>Advanced AI Engineering<small>Demo Gallery</small></span></a>
+    <span class="spacer"></span>
+    <nav>
+      <a href="../index.html">◂ All demos</a>
+      <a href="task2.html">Next: Error Analysis Report ▸</a>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">☾</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div class="crumbs"><a href="../index.html">Gallery</a> › Day 4 · Vision, MLOps &amp; Feedback Loops › Task 1</div>
+    <div class="tags">
+      <span class="badge b-blue">Day 4 · Task 1</span>
+      <span class="badge">Lab 1</span>
+      <span class="badge tag-mods">MODULE 1 · FAILURE TAXONOMY · PER-CLASS RECALL · THE LABEL AUDIT · CAPTURE CONDITIONS</span>
+    </div>
+    <h1>Why Does the Model Fail?</h1>
+    <p class="tagline">Between <strong>10% and 30%</strong> of your "model failures" are labelling failures — and you
+      cannot know which without <strong>looking at the failures one by one</strong>. This bench diagnoses before it
+      proposes, and the finding that changes the conversation is almost never the one people expect.</p>
+  </div>
+
+  <!-- ---------------------------------------------------------- scenario -->
+  <section class="section" data-reveal>
+    <h2>The scenario</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <p>A trained surface-crack inspection model comes back with a headline score that is <em>not good enough</em>, and
+           everyone in the room already has an opinion about why — more data, a bigger backbone, more augmentation. The lab
+           exists to make you <strong>diagnose before you propose</strong>: extract features once, then iterate on the
+           classifier, the labels and the capture conditions in seconds.</p>
+        <p style="margin-bottom:0">The corpus is 40,000 real concrete-surface photographs (cracked / uncracked). We seal two
+           corruptions into it at rates only we know — label noise and capture-condition shift — so that later the audit can
+           be <strong>checked against the truth it was hiding</strong>.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:.6rem">The set-up <span class="note-sim">(ground truth, sealed)</span></h3>
+        <dl class="kv">
+          <dt>Corpus</dt><dd>40k @ 227×227 · cracked / uncracked</dd>
+          <dt>Features</dt><dd>MobileNetV3-small · penult. layer, cached</dd>
+          <dt>Classifier</dt><dd>LogisticRegression · trains &lt; 1 s</dd>
+          <dt>Split</dt><dd>70/30 stratified · group + true label held out</dd>
+          <dt>Injected label noise</dt><dd>≈ 11.0% (sealed)</dd>
+          <dt>Capture shifts</dt><dd>normal · low-light · glare · blur</dd>
+          <dt>Licences</dt><dd>data: verify @ source · weights: BSD-3</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- what to build -->
+  <section class="section" data-reveal>
+    <h2>What the attendees must build</h2>
+    <ul class="checklist grid-2 grid">
+      <li>Overall accuracy <b>never shown without per-class recall</b> beside it — the automatic-deduction rule made structural</li>
+      <li>The 50 highest-confidence false negatives + 50 false positives, rendered as a grid you <b>actually open and tag</b></li>
+      <li>A five-category failure taxonomy: small · low-contrast · occluded · specific-class · benign-shadow, with counts</li>
+      <li>A <b>label audit</b> on 30 reviewed failures by two independent reviewers — how many were mislabels, not model errors</li>
+      <li>Cohen's <b>kappa</b> between the two reviewers = the model's realistic ceiling, and the headline recomputed with corrections</li>
+      <li>Recall broken down by <b>capture-condition group</b> — one group carries a disproportionate share</li>
+      <li>A ranked taxonomy and <b>one sentence</b> naming the constraint, with the evidence that rules out the other three</li>
+      <li>Licence position recorded for both dataset and pretrained weights, with the date checked</li>
+    </ul>
+  </section>
+
+  <!-- ---------------------------------------------------------- THE BENCH -->
+  <section class="section" data-reveal>
+    <h2>The live diagnosis bench</h2>
+
+    <div id="verdict" class="verdict v-warn" style="margin-bottom:1rem">
+      <span class="dot d-warn"></span>
+      <div>
+        <div class="vt" id="verdict-title">CONSTRAINT · Label consistency — not model capacity</div>
+        <div class="vs" id="verdict-sub">30% of audited "model failures" were mislabels · reviewers agree at κ 0.78 · a 95% target asks the model to be more consistent than its own ground truth.</div>
+      </div>
+    </div>
+
+    <!-- headline: accuracy WITH per-class recall, always together -->
+    <div class="card">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">The honest headline — accuracy <em>with</em> per-class recall, never one without the other</div>
+          <div class="chart-sub">A single accuracy number hides which class is failing. On an inspection model the class that matters is the one whose miss escapes to the customer.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="corrected-toggle"><span class="track"></span>Apply audit-corrected labels</label>
+      </div>
+      <div class="grid grid-4 keep2" style="margin-bottom:1rem">
+        <div class="metric accent-blue"><div class="label">Overall accuracy</div><div class="value" id="m-acc">90.1%</div><div class="sub" id="m-acc-sub">held-out 30% · as-labelled</div></div>
+        <div class="metric accent-bad"><div class="label">Recall · cracked (defect)</div><div class="value" id="m-rc">0.847</div><div class="sub">the miss that escapes</div></div>
+        <div class="metric"><div class="label">Recall · uncracked</div><div class="value sm" id="m-ru">0.955</div><div class="sub">the miss that scraps a good part</div></div>
+        <div class="metric"><div class="label">Realistic ceiling</div><div class="value sm">≈ 89%</div><div class="sub">where inspectors agree (κ 0.78)</div></div>
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <div class="chart-sub">Per-class recall — as-labelled vs audit-corrected</div>
+          <div id="recall-chart"></div>
+        </div>
+        <div>
+          <div class="chart-sub">Recall by capture-condition group — one group carries the failures</div>
+          <div id="capture-chart"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- the failure grid: you must look -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">Look at the failures — the step that resists automation</div>
+          <div class="chart-sub">The 50 highest-confidence false negatives and 50 false positives, each tagged by eye. Copilot can build the grid; it cannot do the looking. No real photos — every tile carries its reviewer tag.</div>
+        </div>
+        <div class="seg" id="grid-seg">
+          <button class="active" data-set="fn">50 false negatives</button>
+          <button data-set="fp">50 false positives</button>
+          <button data-set="all">All 100</button>
+        </div>
+      </div>
+      <div class="legend" id="tile-legend" style="margin-bottom:.8rem"></div>
+      <div id="tile-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(30px,1fr));gap:5px"></div>
+      <div class="callout warn" id="grid-note" style="margin-top:1rem"><div class="k">What the eye finds</div><p style="margin:.3rem 0 0" id="grid-note-text"></p></div>
+    </div>
+
+    <!-- the label audit -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">The label audit — the step that changes minds</div>
+          <div class="chart-sub">30 reviewed failures, judged independently by two team members without seeing the model's answer. A "model failure" that was a labelling failure is a case where more data makes things <em>worse</em>.</div>
+        </div>
+      </div>
+      <div class="grid grid-4 keep2" style="margin-bottom:1rem">
+        <div class="metric accent-warn"><div class="label">Mislabels found</div><div class="value">9 / 30</div><div class="sub">of reviewed failures</div></div>
+        <div class="metric"><div class="label">Share that were label failures</div><div class="value sm">30%</div><div class="sub">in the 10–30% band, as warned</div></div>
+        <div class="metric accent-blue"><div class="label">Injected rate (sealed)</div><div class="value sm">11.0%</div><div class="sub">base rate across the corpus</div></div>
+        <div class="metric"><div class="label">Reviewer agreement</div><div class="value sm">κ 0.78</div><div class="sub">Cohen's kappa · your ceiling</div></div>
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <div class="chart-sub">Label errors concentrate in failures — audited-failure rate vs the corpus base rate</div>
+          <div id="enrich-chart"></div>
+          <p class="small" style="margin:.6rem 0 0">The audit found label errors at <b>≈ 3×</b> the base rate <em>because it looked where the model already fails</em>. A random sample would have recovered the 11% and told you nothing about which failures to fix.</p>
+        </div>
+        <div>
+          <div class="chart-sub">The headline, recomputed with the audited labels corrected</div>
+          <div id="gap-chart"></div>
+          <p class="small" style="margin:.6rem 0 0">The gap between the two bars was <b>real and invisible</b>: 2.5 points of "model error" that a bigger model could never have recovered, because there was nothing wrong with the model on those cases.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- constraint table -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="chart-title">Name the constraint — rule the other three out, don't pick a favourite</div>
+      <div class="chart-sub">Six situations × the effect each intervention would have. Four of six rows are <em>not</em> solved by more data. Establish which row you are in before anyone funds a collection programme.</div>
+      <div class="table-wrap" style="margin-top:.7rem">
+        <table class="data">
+          <thead><tr><th>If the situation is…</th><th>More data</th><th>Better labels</th><th>Better capture</th></tr></thead>
+          <tbody id="constraint-body"></tbody>
+        </table>
+      </div>
+      <div class="callout" style="margin-top:1rem;border-color:var(--ac-blue)">
+        <div class="k">The one sentence</div>
+        <p style="margin:.3rem 0 0"><strong>The constraint is labels.</strong> It is not more data (row 1 &amp; 6: more data adds inconsistency and has no effect on borderline-part disagreement); it is not capture as the primary limit (low-light hurts, but corrected recall still trails the label ceiling); it is not model capacity (κ 0.78 caps consistency at ≈ 89%, and 30% of failures were mislabels a larger model would have learned to reproduce). The honest fix is a written guideline with boundary examples and a re-label of the affected subset.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- the trap -->
+  <section class="section" data-reveal>
+    <h2>The trap Copilot will hand you</h2>
+    <div class="callout bad">
+      <div class="k">One number, no per-class breakdown</div>
+      <p style="margin:.3rem 0 0">Ask for "accuracy" and you get 90.1% and a green tick. That number is worth <strong>minus ten marks</strong> today, because it
+        hides that the <em>defect</em> class recalls at 0.847 while the easy class sits at 0.955 — the entire failure is in the class whose miss escapes to the
+        customer. Toggle <em>"Apply audit-corrected labels"</em> above and watch the honest headline move without a single training run.</p>
+    </div>
+    <div class="callout warn">
+      <div class="k">"Collect more data" before ruling out labels and capture</div>
+      <p style="margin:.3rem 0 0">The default proposal is a collection programme. But four of the six constraint rows are unmoved by more data, and 30% of the reviewed failures
+        were mislabels — every one of those is a case where more data <strong>makes things worse</strong>. Recommending collection without the evidence that rules
+        out labels and capture first is the other <strong>minus-ten</strong> habit this lab exists to break.</p>
+    </div>
+    <div class="callout">
+      <div class="k">The augmentation that lies about your process</div>
+      <p style="margin:.3rem 0 0">Copilot will offer horizontal flips and 90° rotations because every tutorial has them. On a fixed camera over a fixed fixture, each is a
+        <em>false claim about your process</em> — you would be teaching the model to ignore an orientation that carries information. Every augmentation is a claim;
+        check it with someone who knows the line before applying it to a million images.</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- lesson -->
+  <section class="section" data-reveal>
+    <div class="lesson">
+      <div class="k">The lesson this build makes undeniable</div>
+      <h3>Label consistency sets the ceiling — your model cannot be more consistent than the ground truth it learns from.</h3>
+      <p style="margin-bottom:0">A headline score is a starting question, not an answer. The diagnosis that changes the conversation with management is not
+        "the model is 90%" — it is "<b>30% of what we called model failures were labelling failures</b>, our reviewers agree at κ 0.78, and a 95% target is asking
+        the model to be more consistent than the labels it was trained on." That finding is invisible until someone opens the failure grid and looks.</p>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="chart-title">Defend your result</div>
+      <p style="margin:.5rem 0 0;font-style:italic;color:var(--ink)">"Our headline was <b>90.1%</b>. Per class it was <b>0.847</b> on cracked and <b>0.955</b> on
+        uncracked. Of 30 audited failures, <b>9 were labelling errors</b> — we injected <b>11%</b>, and the audit found label errors at <b>3×</b> that rate because
+        it looked where the model fails. Our two reviewers agreed at <b>κ 0.78</b>. Recall on the <b>low-light</b> group was <b>15 points</b> below the rest. The
+        constraint is <b>labels</b>, and it is not more data because four of six situations are unmoved by it and a third of our failures never were model errors."</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- pagenav -->
+  <nav class="pagenav">
+    <a href="../day3/task4.html"><div class="pn"><small>◂ Day 3 · Task 4</small><b>Previous task</b></div></a>
+    <a href="task2.html"><div class="pn next"><small>Next ▸ Day 4 · Task 2</small><b>Error Analysis Report &amp; Three Hypotheses</b></div></a>
+  </nav>
+
+  <p class="note-sim" style="margin-top:2rem">All figures on this page are generated in your browser from a seeded simulator matching the Task 1 specification. No backend, no external calls, no real photographs. The injected label-noise rate, capture shifts, kappa and cost figures are the illustrative placeholders from the task pack.</p>
+
+</main>
+
+<footer class="footer"><div class="footer-inner"><div>Atlas Copco · Advanced AI Engineering Bootcamp — Reference Demo Gallery</div><div class="small">Day 4 · Task 1</div></div></footer>
+
+<script src="../assets/charts.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+/* ---- Failure taxonomy: tags, colours, and per-set counts ----------------- */
+const TAGS = {
+  lowcon: {name:"low contrast", color:"--c4"},
+  small:  {name:"small defect", color:"--c3"},
+  occ:    {name:"occluded",     color:"--c2"},
+  cls:    {name:"specific class", color:"--c1"},
+  benign: {name:"benign shadow / nothing wrong", color:"--c6"}
+};
+// hand-set distributions consistent with the task narrative
+const FN_DIST = { lowcon:18, small:14, occ:8, cls:6, benign:4 };   // 50 false negatives
+const FP_DIST = { benign:38, cls:5, lowcon:4, occ:2, small:1 };    // 50 false positives — 38/50 share one benign feature
+
+function buildSet(dist, kind){
+  const arr=[];
+  for(const k in dist){ for(let i=0;i<dist[k];i++) arr.push({tag:k, kind}); }
+  return arr;
+}
+const FN = buildSet(FN_DIST,"FN"), FP = buildSet(FP_DIST,"FP");
+// deterministic shuffle so the grid reads as "unsorted, then tagged"
+function shuffle(a, seed){ const r=AC.rng(seed); const b=a.slice(); for(let i=b.length-1;i>0;i--){ const j=Math.floor(r()*(i+1)); [b[i],b[j]]=[b[j],b[i]]; } return b; }
+
+let gridState = "fn";
+
+function drawTiles(){
+  let items;
+  if(gridState==="fn") items = shuffle(FN, 11);
+  else if(gridState==="fp") items = shuffle(FP, 12);
+  else items = shuffle(FN.concat(FP), 13);
+  const g = document.getElementById("tile-grid");
+  g.innerHTML = items.map(it=>{
+    const c = TAGS[it.tag].color;
+    const ring = it.kind==="FP" ? "box-shadow:inset 0 0 0 1px var(--border-strong);" : "";
+    return `<div title="${it.kind} · ${TAGS[it.tag].name}" style="aspect-ratio:1;border-radius:6px;background:color-mix(in srgb, var(${c}) 82%, var(--surface));${ring}"></div>`;
+  }).join("");
+  // legend with counts for the active set
+  const dist = gridState==="fn"?FN_DIST : gridState==="fp"?FP_DIST : mergeDist(FN_DIST,FP_DIST);
+  document.getElementById("tile-legend").innerHTML = Object.keys(TAGS).map(k=>
+    `<span class="li"><span class="sw" style="background:var(${TAGS[k].color})"></span>${TAGS[k].name} · <b style="color:var(--ink)">${dist[k]||0}</b></span>`
+  ).join("");
+  const note = document.getElementById("grid-note-text");
+  if(gridState==="fp"){
+    note.innerHTML = "<b>38 of the 50 false positives share one benign feature</b> — a shadow at the fixture edge the model has learned to treat as a crack. That is a targeted fix that removes the whole cluster at once, and no amount of new defect data would have found it.";
+  } else if(gridState==="fn"){
+    note.innerHTML = "The false negatives cluster on <b>low contrast (18)</b> and <b>small defects (14)</b> — 32 of 50 are cases where the honest fix is <em>optical, not algorithmic</em>: raking light for contrast, magnification or tiling for size. An afternoon looking at 200 failures beats a month of tuning.";
+  } else {
+    note.innerHTML = "Two different failures, two different fixes: the false negatives are dominated by <b>low contrast and small size</b> (a capture/optics problem); the false positives are dominated by a single <b>benign shadow</b> (a labelling/guideline problem). One accuracy number would have hidden both.";
+  }
+}
+function mergeDist(a,b){ const o={}; for(const k in TAGS) o[k]=(a[k]||0)+(b[k]||0); return o; }
+
+/* ---- Constraint table ---------------------------------------------------- */
+const EFF = {
+  none:  '<span class="badge">no effect</span>',
+  small: '<span class="badge b-info">small</span>',
+  mod:   '<span class="badge b-warn">moderate</span>',
+  large: '<span class="badge b-ok">large</span>',
+  worse: '<span class="badge b-bad">adds noise</span>'
+};
+const CONSTRAINTS = [
+  ["Labels are inconsistent", "worse", "large", "none"],
+  ["Defect smaller than the model can resolve", "none", "none", "large"],
+  ["A defect class has only 12 examples", "large", "mod", "none"],
+  ["Lighting varies uncontrolled between shifts", "small", "none", "large"],
+  ["Model overfits a small clean set", "mod", "small", "small"],
+  ["Two inspectors disagree on borderline parts", "none", "large", "none"]
+];
+document.getElementById("constraint-body").innerHTML = CONSTRAINTS.map(r=>
+  `<tr><td>${r[0]}</td><td>${EFF[r[1]]}</td><td>${EFF[r[2]]}</td><td>${EFF[r[3]]}</td></tr>`).join("");
+
+/* ---- Headline numbers, as-labelled vs corrected -------------------------- */
+const HEAD = {
+  raw:  { acc:90.1, rc:0.847, ru:0.955 },
+  corr: { acc:92.6, rc:0.881, ru:0.968 }
+};
+let corrected = false;
+function setHeadline(){
+  const h = corrected ? HEAD.corr : HEAD.raw;
+  document.getElementById("m-acc").textContent = h.acc.toFixed(1)+"%";
+  document.getElementById("m-rc").textContent  = h.rc.toFixed(3);
+  document.getElementById("m-ru").textContent  = h.ru.toFixed(3);
+  document.getElementById("m-acc-sub").textContent = corrected ? "held-out 30% · audit-corrected" : "held-out 30% · as-labelled";
+}
+
+/* ---- Charts -------------------------------------------------------------- */
+function drawCharts(){
+  // per-class recall grouped bar
+  AC.bar(document.getElementById("recall-chart"), {
+    h:220, min:0, max:1, ticks:5, dp:2,
+    groups:{ categories:["Cracked (defect)","Uncracked"], series:[
+      {name:"As-labelled", color:"var(--c7)", values:[HEAD.raw.rc, HEAD.raw.ru]},
+      {name:"Audit-corrected", color:"var(--ac-blue)", values:[HEAD.corr.rc, HEAD.corr.ru]}
+    ]}
+  });
+  // capture-condition recall
+  AC.bar(document.getElementById("capture-chart"), {
+    h:220, min:0, max:1, ticks:5, dp:2, vfmt:v=>v.toFixed(2),
+    data:[
+      {label:"normal", value:0.94, color:"var(--c1)"},
+      {label:"low-light", value:0.79, color:"var(--bad)"},
+      {label:"glare", value:0.90, color:"var(--c1)"},
+      {label:"blur", value:0.88, color:"var(--c1)"}
+    ]
+  });
+  // enrichment: base rate vs audited-failure rate
+  AC.bar(document.getElementById("enrich-chart"), {
+    h:190, min:0, max:35, ticks:5, dp:0, vfmt:v=>v.toFixed(0)+"%",
+    data:[
+      {label:"Corpus base rate", value:11, color:"var(--c7)"},
+      {label:"Among audited failures", value:30, color:"var(--warn)"}
+    ]
+  });
+  // headline gap: accuracy raw vs corrected
+  AC.bar(document.getElementById("gap-chart"), {
+    h:190, min:85, max:95, ticks:5, dp:1, vfmt:v=>v.toFixed(1)+"%",
+    data:[
+      {label:"As-labelled", value:HEAD.raw.acc, color:"var(--c7)"},
+      {label:"Audit-corrected", value:HEAD.corr.acc, color:"var(--ok)"}
+    ]
+  });
+}
+
+/* ---- wire controls ------------------------------------------------------- */
+document.querySelectorAll("#grid-seg button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("#grid-seg button").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active"); gridState=b.dataset.set; drawTiles();
+}));
+document.getElementById("corrected-toggle").addEventListener("change",e=>{ corrected=e.target.checked; setHeadline(); });
+
+function render(){ setHeadline(); drawCharts(); drawTiles(); }
+AC.renderAll(render);
+AC.onThemeChange(render);
+</script>
+</body>
+</html>

@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Nineteen Layers · Day 2 Task 2</title>
+<meta name="description" content="Reference demo: a PoC has three components; a production system has nineteen. A layer manifest, a chaos drill that breaks dependencies while the service runs, and the number that wins the lab — percentage of requests answered usefully while a dependency is down.">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  /* task-local: layer manifest grid + block diagram */
+  .layer-group { margin-bottom:1rem; }
+  .layer-group .gh { display:flex; align-items:center; gap:.5rem; margin-bottom:.45rem; }
+  .layer-group .gh b { font-size:.9rem; }
+  .layer-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:.5rem; }
+  .lcell { border-radius:9px; padding:.6rem .7rem; border:1px solid var(--border); background:var(--surface-2); position:relative; overflow:hidden; }
+  .lcell::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; }
+  .lcell.present::before { background:var(--ok); } .lcell.planned::before { background:var(--warn); } .lcell.excluded::before { background:var(--ink-faint); }
+  .lcell .ln { font-weight:700; font-size:.86rem; color:var(--ink); }
+  .lcell .ls { font-size:.72rem; text-transform:uppercase; letter-spacing:.03em; font-weight:700; margin-top:.15rem; }
+  .lcell.present .ls { color:var(--ok); } .lcell.planned .ls { color:var(--warn); } .lcell.excluded .ls { color:var(--ink-3); }
+  .lcell .lr { font-size:.74rem; color:var(--ink-3); margin-top:.25rem; line-height:1.35; }
+  .blockdiag { display:grid; grid-template-columns:1fr 1fr; gap:1.1rem; }
+  @media(max-width:760px){ .blockdiag { grid-template-columns:1fr; } }
+  .bd { border:1px dashed var(--border-strong); border-radius:12px; padding:1rem; background:var(--surface-2); }
+  .bd h4 { margin:0 0 .7rem; font-size:.82rem; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-3); }
+  .bd-flow { display:flex; flex-direction:column; gap:.5rem; }
+  .bd-box { border-radius:9px; padding:.55rem .7rem; font-size:.82rem; font-weight:650; text-align:center; border:1px solid var(--border); background:var(--surface); color:var(--ink); }
+  .bd-box.grp { background:color-mix(in srgb,var(--ac-blue) 12%,var(--surface)); border-color:transparent; }
+  .bd-arrow { text-align:center; color:var(--ink-faint); font-size:.9rem; line-height:1; }
+  .bd-row { display:flex; gap:.4rem; flex-wrap:wrap; }
+  .bd-row .bd-box { flex:1; min-width:60px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../index.html"><span class="logo">AC</span><span>Advanced AI Engineering<small>Demo Gallery</small></span></a>
+    <span class="spacer"></span>
+    <nav>
+      <a href="../index.html">◂ All demos</a>
+      <a href="task3.html">Next: Ingestion Architecture ▸</a>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">☾</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div class="crumbs"><a href="../index.html">Gallery</a> › Day 2 · Architecture, Data &amp; Security › Task 2</div>
+    <div class="tags">
+      <span class="badge b-blue">Day 2 · Task 2</span>
+      <span class="badge">Lab 2</span>
+      <span class="badge tag-mods">MODULE 2 · ORCHESTRATION · RETRY &amp; FALLBACK · REGISTRIES · AUDIT · CHAOS DRILL</span>
+    </div>
+    <h1>The Nineteen Layers</h1>
+    <p class="tagline">A proof of concept has three components: a script, a model call, and a notebook someone runs. A production system has
+      nineteen — and <strong>the other sixteen each exist because something failed without them.</strong> The facilitator breaks your dependencies
+      while the service runs, and you find out which layers you actually built.</p>
+  </div>
+
+  <!-- scenario -->
+  <section class="section" data-reveal>
+    <h2>The scenario</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <p>You have a working PoC. It answers questions correctly and <strong>it cannot be deployed</strong> — and the gap between those two
+           facts is sixteen layers. Build the naive version deliberately, measure it, then add the layers that make it a system.</p>
+        <p style="margin-bottom:0">Then the chaos drill: a fixed load of 200 requests through your service while four faults are injected in turn.
+           No code changes during the drill. The number that wins the lab is <b>percentage of requests answered usefully while a dependency is down</b> —
+           and the naive PoC scores zero on every fault.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:.6rem">Scored deductions you must avoid <span class="note-sim">(automatic)</span></h3>
+        <dl class="kv">
+          <dt>−10</dt><dd>Any diagram box with no running component or “planned” marking</dd>
+          <dt>−10</dt><dd>Any external call in the code with no timeout</dd>
+          <dt>Grep test</dt><dd>Every <span class="mono">httpx</span> call shows an explicit deadline in front of the room</dd>
+          <dt>Three stores</dt><dd>Monitoring, logging, audit — separate shapes and retention</dd>
+          <dt>Both run</dt><dd>Naive PoC and layered service measured on the same load</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- what to build -->
+  <section class="section" data-reveal>
+    <h2>What the attendees must build</h2>
+    <ul class="checklist grid-2 grid">
+      <li>A deliberately naive <span class="mono">poc.py</span> — no auth, timeout, retry, logging or versioning — measured as the baseline</li>
+      <li>A <span class="mono">layers.yaml</span> covering all layers as <b>present / planned / excluded</b>, every exclusion carrying a reason</li>
+      <li>Orchestration with all six responsibilities: routing, sequencing, retry-with-backoff, <b>timeouts</b>, context assembly, guardrail hook</li>
+      <li>Model serving that returns a model version, a prompt-keyed cache, and cheap/expensive routes</li>
+      <li>Prompt and model registries — versioned, authoritative, reported on every response</li>
+      <li>Monitoring, logging and audit as <b>three separate stores</b> with different retention</li>
+      <li>A chaos drill measuring served / failed / p95 / caller-experience for four faults, against both services</li>
+      <li>A scalability risk table naming what breaks at 10× volume and which component first — <b>measured, not guessed</b></li>
+    </ul>
+  </section>
+
+  <!-- naive vs layered -->
+  <section class="section" data-reveal>
+    <h2>The live service — naive PoC vs layered system</h2>
+
+    <div class="verdict v-ok" style="margin-bottom:1rem">
+      <span class="dot d-ok"></span>
+      <div>
+        <div class="vt">Layered service answers 89% usefully while a dependency is down · the PoC answers 0%</div>
+        <div class="vs">Same 200-request load, same faults. The single layer that made the largest difference was <b>timeouts inside orchestration</b> —
+          without them, retry made the slow-endpoint outage three times longer.</div>
+      </div>
+    </div>
+
+    <div class="grid grid-4 keep2" style="margin-bottom:1.1rem">
+      <div class="metric accent-bad"><div class="label">PoC success rate</div><div class="value">62%</div><div class="sub">any hiccup is a 500</div></div>
+      <div class="metric accent-ok"><div class="label">Layered success rate</div><div class="value">98%</div><div class="sub">degrades, never dies</div></div>
+      <div class="metric"><div class="label">PoC p95 latency</div><div class="value sm">9.4 s</div><div class="sub">no timeout — unbounded</div></div>
+      <div class="metric"><div class="label">Layered p95 latency</div><div class="value sm">2.4 s</div><div class="sub">deadline + cache</div></div>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="chart-title">Same load, two services — 200 requests</div>
+        <div class="chart-sub">Success rate, p50 and p95 on a clean run, before any fault is injected.</div>
+        <div id="baseline-chart"></div>
+      </div>
+      <div class="card">
+        <div class="chart-title">What the caller sees when something goes wrong</div>
+        <div class="table-wrap" style="margin-top:.6rem">
+          <table class="data">
+            <thead><tr><th>Condition</th><th>Naive PoC</th><th>Layered service</th></tr></thead>
+            <tbody>
+              <tr><td>Model error</td><td class="muted">raw 500 + stack trace</td><td>degraded answer + request id</td></tr>
+              <tr><td>Slow dependency</td><td class="muted">hangs until browser gives up</td><td>times out at 2.5 s, says so</td></tr>
+              <tr><td>Rate limited</td><td class="muted">cascade of 500s</td><td>backs off, sheds load</td></tr>
+              <tr><td>No auth</td><td class="muted">anyone calls it</td><td>bearer JWT + role policy</td></tr>
+              <tr><td>Which model?</td><td class="muted">unknown</td><td>version on every response</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- layer manifest -->
+  <section class="section" data-reveal>
+    <h2>The layer manifest — decided before it is built</h2>
+    <p class="small" style="margin-top:-.4rem">The target-state diagram is generated from this file, so the diagram cannot claim anything the
+      manifest does not. An exclusion is a legitimate answer worth marks — <b>“we decided not to, because”</b> scores full; <b>“we never thought about it”</b> scores zero.</p>
+    <div class="card">
+      <div class="control-row" style="margin-bottom:1rem">
+        <span class="chip"><span style="width:10px;height:10px;border-radius:3px;background:var(--ok);display:inline-block"></span> Present <span id="c-present" class="mono"></span></span>
+        <span class="chip"><span style="width:10px;height:10px;border-radius:3px;background:var(--warn);display:inline-block"></span> Planned <span id="c-planned" class="mono"></span></span>
+        <span class="chip"><span style="width:10px;height:10px;border-radius:3px;background:var(--ink-faint);display:inline-block"></span> Excluded (with reason) <span id="c-excluded" class="mono"></span></span>
+      </div>
+      <div id="manifest"></div>
+    </div>
+  </section>
+
+  <!-- chaos drill -->
+  <section class="section" data-reveal>
+    <h2>The chaos drill — four faults, no code changes</h2>
+    <div class="card">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">Percentage of requests answered <em>usefully</em> while a dependency is down</div>
+          <div class="chart-sub">The number that wins the lab. Naive PoC scores zero on every fault; the layered service degrades honestly. Select a fault to see both services' served / failed / p95 and what the caller saw.</div>
+        </div>
+        <div class="seg" id="fault-seg">
+          <button class="active" data-i="0">Unreachable</button>
+          <button data-i="1">Slow +8s</button>
+          <button data-i="2">HTTP 429</button>
+          <button data-i="3">Store down</button>
+        </div>
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <div class="chart-sub">Useful-answer rate per fault — naive vs layered</div>
+          <div id="chaos-chart"></div>
+        </div>
+        <div>
+          <div class="grid grid-2 keep2" style="margin-bottom:.8rem">
+            <div class="metric accent-ok"><div class="label" id="f-name">Endpoint unreachable</div><div class="value" id="f-useful">86%</div><div class="sub">layered · answered usefully</div></div>
+            <div class="metric accent-bad"><div class="label">Naive PoC</div><div class="value sm">0%</div><div class="sub" id="f-poc">every request errors</div></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data">
+              <thead><tr><th>Metric</th><th class="num">Naive</th><th class="num">Layered</th></tr></thead>
+              <tbody id="f-body"></tbody>
+            </table>
+          </div>
+          <div class="callout" style="margin-top:.8rem;background:var(--surface-2)"><div class="k">What the caller saw</div><p class="small" id="f-caller" style="margin:.2rem 0 0"></p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout bad" style="margin-top:1.1rem">
+      <div class="k">The planted defect the drill finds</div>
+      <p style="margin:.3rem 0 0"><strong>Retry without a timeout makes an outage three times longer, not shorter.</strong> Copilot gives you retries; it will
+        not give you timeouts. Each attempt waits indefinitely and you have now queued three of them — the slow-endpoint fault turns a 3-second call into a
+        27-second one. Every external call needs a deadline shorter than your own caller's patience. Grep for it in front of the room.</p>
+    </div>
+  </section>
+
+  <!-- diagrams + scalability -->
+  <section class="section" data-reveal>
+    <h2>Current state vs target state — generated, not drawn</h2>
+    <div class="card">
+      <div class="chart-sub" style="margin-bottom:.8rem">A hand-drawn diagram can claim anything; one generated from the code and the manifest cannot. Left is exactly what <span class="mono">poc.py</span> does. Right is the manifest, coloured by status.</div>
+      <div class="blockdiag">
+        <div class="bd">
+          <h4>Current state · poc.py (3 components)</h4>
+          <div class="bd-flow">
+            <div class="bd-box">Notebook someone runs</div>
+            <div class="bd-arrow">▼</div>
+            <div class="bd-box">FastAPI script · POST /ask</div>
+            <div class="bd-arrow">▼</div>
+            <div class="bd-box">Azure OpenAI call · raw text out</div>
+          </div>
+          <p class="small" style="margin:.8rem 0 0">No auth, no timeout, no retry, no logging, no version. Nothing that is not in the code appears in the diagram.</p>
+        </div>
+        <div class="bd">
+          <h4>Target state · from layers.yaml</h4>
+          <div class="bd-flow">
+            <div class="bd-box grp">Access · interface → api → auth → authz → rbac</div>
+            <div class="bd-arrow">▼</div>
+            <div class="bd-box grp">Reasoning · orchestration (routing · retry+timeout · guardrail) → model serving</div>
+            <div class="bd-arrow">▼</div>
+            <div class="bd-row">
+              <div class="bd-box">Vector</div><div class="bd-box">Relational</div><div class="bd-box">Feature</div>
+            </div>
+            <div class="bd-arrow">▼</div>
+            <div class="bd-box grp">Governance · prompt + model registry</div>
+            <div class="bd-arrow">▼</div>
+            <div class="bd-row">
+              <div class="bd-box">Monitoring</div><div class="bd-box">Logging</div><div class="bd-box">Audit</div>
+            </div>
+            <div class="bd-arrow">▼</div>
+            <div class="bd-box grp">Improvement · feedback → (human approval, planned)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:1.1rem">
+      <div class="chart-title">Scalability risk — run 10× the load and watch, do not guess</div>
+      <div class="chart-sub">Ranked by what blocks production first. Each break point is the measured multiple at which the component degrades past its SLO.</div>
+      <div class="table-wrap" style="margin-top:.6rem">
+        <table class="data">
+          <thead><tr><th>#</th><th>Component</th><th>What breaks at 10× volume</th><th class="num">Breaks at</th><th>Measured symptom</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">1</td><td><b>Model serving</b></td><td>connection pool exhausts; requests queue behind the deadline</td><td class="num">3.2×</td><td class="muted">p95 1.9 s → 11.8 s</td></tr>
+            <tr><td class="mono">2</td><td>Vector store</td><td>query latency doubles as the index no longer fits in page cache</td><td class="num">5.8×</td><td class="muted">recall unchanged, p95 +140%</td></tr>
+            <tr><td class="mono">3</td><td>Audit (relational)</td><td>append contention on the immutable log; write lock waits</td><td class="num">7.1×</td><td class="muted">write p95 40 ms → 380 ms</td></tr>
+            <tr><td class="mono">4</td><td>Orchestration</td><td>worker pool saturates; context assembly starves</td><td class="num">8.4×</td><td class="muted">throughput plateaus</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small" style="margin:.7rem 0 0">Model serving goes first, at <b>3.2×</b> — well short of ten. Knowing that is worth more than a diagram that promises
+        the system scales, because we ran it.</p>
+    </div>
+  </section>
+
+  <!-- lesson -->
+  <section class="section" data-reveal>
+    <div class="lesson">
+      <div class="k">The lesson this build makes undeniable</div>
+      <h3>The sixteen extra layers are not bureaucracy — each one is a failure you have not had yet.</h3>
+      <p style="margin-bottom:0">A PoC that answers correctly and a system that stays up under a broken dependency are different artefacts. The manifest
+        forces a deliberate decision about every layer — including the decision to leave one out, with a reason. The chaos drill converts that decision into a
+        number: percentage answered usefully while a dependency is down.</p>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="chart-title">Defend your result</div>
+      <p style="margin:.5rem 0 0;font-style:italic;color:var(--ink)">“Our PoC served <b>0%</b> of requests during a dependency outage; our layered service served
+        <b>89%</b>. The layer that made the largest difference was <b>timeouts inside orchestration</b>. We deliberately excluded the <b>graph store</b> and the
+        <b>skill registry</b> because we have no relationship queries and only one skill. At ten times volume the first thing to break is <b>model serving</b>,
+        at 3.2×, and we know because we ran it.”</p>
+    </div>
+  </section>
+
+  <!-- pagenav -->
+  <nav class="pagenav">
+    <a href="task1.html"><div class="pn"><small>◂ Day 2 · Task 1</small><b>Pattern Selection Bench</b></div></a>
+    <a href="task3.html"><div class="pn next"><small>Next ▸ Day 2 · Task 3</small><b>Ingestion Architecture</b></div></a>
+  </nav>
+
+  <p class="note-sim" style="margin-top:2rem">All figures on this page are generated in your browser from a seeded simulator matching the Task 2 specification. No backend, no external calls. Latency and success figures are illustrative placeholders consistent with the task pack.</p>
+
+</main>
+
+<footer class="footer"><div class="footer-inner"><div>Atlas Copco · Advanced AI Engineering Bootcamp — Reference Demo Gallery</div><div class="small">Day 2 · Task 2</div></div></footer>
+
+<script src="../assets/charts.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+/* ---------- Layer manifest -------------------------------------------- */
+const GROUPS = [
+  { name:"Access", layers:[
+    ["Interface","present","Streamlit + typed request schema"],
+    ["API","present","/v1/ask · rate limit · request id"],
+    ["Authentication","present","Signed JWT, shared secret"],
+    ["Authorisation","present","Policy decides allowed operations"],
+    ["RBAC","present","Role on the token, enforced"]
+  ]},
+  { name:"Reasoning", layers:[
+    ["Orchestration","present","Routing · retry+backoff · timeout · guardrail"],
+    ["Tool integration","present","Retrieval tool, deadline-bounded"],
+    ["Model serving","present","Version + prompt-keyed cache + routes"]
+  ]},
+  { name:"Data", layers:[
+    ["Vector store","present","FAISS index, version-tagged vectors"],
+    ["Relational","present","Requests, feedback, audit rows"],
+    ["Object store","planned","Raw artefacts land locally for now"],
+    ["Graph store","excluded","No relationship queries in scope — a graph we do not need"],
+    ["Feature store","present","One definition, training = serving"]
+  ]},
+  { name:"Governance", layers:[
+    ["Prompt registry","present","Versioned files; version on every response"],
+    ["Skill registry","excluded","Only one skill; register once the second lands"],
+    ["Model registry","present","Version · score · dataset · approver, in JSON"]
+  ]},
+  { name:"Operations", layers:[
+    ["Monitoring","present","Aggregated, fast — separate store"],
+    ["Logging","present","Per-request traces and spans"],
+    ["Audit","present","Append-only, immutable — who asked what"]
+  ]},
+  { name:"Improvement", layers:[
+    ["Feedback loop","present","👍/👎 joined to request id"],
+    ["Human approval","planned","Seam exists; wired for high-risk routes next"]
+  ]}
+];
+function drawManifest(){
+  const host = document.getElementById("manifest");
+  host.innerHTML = GROUPS.map(g=>`
+    <div class="layer-group">
+      <div class="gh"><b>${g.name}</b><span class="small">${g.layers.length} layers</span></div>
+      <div class="layer-grid">
+        ${g.layers.map(l=>`<div class="lcell ${l[1]}" title="${l[2]}"><div class="ln">${l[0]}</div><div class="ls">${l[1]}</div><div class="lr">${l[2]}</div></div>`).join("")}
+      </div>
+    </div>`).join("");
+  const all = GROUPS.flatMap(g=>g.layers);
+  document.getElementById("c-present").textContent = all.filter(l=>l[1]==="present").length;
+  document.getElementById("c-planned").textContent = all.filter(l=>l[1]==="planned").length;
+  document.getElementById("c-excluded").textContent = all.filter(l=>l[1]==="excluded").length;
+}
+drawManifest();
+
+/* ---------- Charts ----------------------------------------------------- */
+function drawBaseline(){
+  AC.bar(document.getElementById("baseline-chart"), { h:230,
+    groups:{ categories:["Success %","p50 (×10 ms)","p95 (×10 ms)"],
+      series:[
+        {name:"Naive PoC", color:"var(--c6)", values:[62, 120, 94]},
+        {name:"Layered", color:"var(--c1)", values:[98, 90, 24]}
+      ]}, ticks:5, dp:0 });
+}
+
+const FAULTS = [
+  { name:"Endpoint unreachable", useful:86, served:172, failed:28, p95n:"timeout", p95l:"2.1 s",
+    poc:"every request errors", caller:"Layered: “Answered from cache; live model unreachable — flagged degraded.” PoC: raw connection-refused 500." },
+  { name:"Endpoint very slow (+8s)", useful:84, served:168, failed:32, p95n:"9.4 s", p95l:"3.0 s",
+    poc:"hangs — no deadline", caller:"Layered: times out at 2.5 s, returns a clean degraded response. PoC: request hangs until the caller gives up." },
+  { name:"Rate limit (HTTP 429)", useful:90, served:181, failed:19, p95n:"cascade", p95l:"2.6 s",
+    poc:"cascade of 500s", caller:"Layered: backs off, queues, sheds excess honestly. PoC: hammers the endpoint and multiplies the 429s into 500s." },
+  { name:"Retrieval store unavailable", useful:95, served:190, failed:10, p95n:"error", p95l:"1.4 s",
+    poc:"KeyError on missing index", caller:"Layered: answers without retrieval and says the knowledge base is offline. PoC: unhandled error, no answer." }
+];
+let faultI = 0;
+function drawChaos(){
+  AC.bar(document.getElementById("chaos-chart"), { h:230,
+    groups:{ categories:["Unreach.","Slow +8s","429","Store down"],
+      series:[
+        {name:"Naive PoC", color:"var(--c6)", values:[0,0,0,0]},
+        {name:"Layered", color:"var(--c5)", values:FAULTS.map(f=>f.useful)}
+      ]}, min:0, max:100, ticks:5, dp:0, vfmt:v=>v+"%" });
+}
+function showFault(){
+  const f = FAULTS[faultI];
+  document.getElementById("f-name").textContent = f.name;
+  document.getElementById("f-useful").textContent = f.useful+"%";
+  document.getElementById("f-poc").textContent = f.poc;
+  document.getElementById("f-caller").textContent = f.caller;
+  document.getElementById("f-body").innerHTML =
+    `<tr><td>Requests served</td><td class="num">0</td><td class="num">${f.served}</td></tr>`+
+    `<tr><td>Requests failed</td><td class="num">200</td><td class="num">${f.failed}</td></tr>`+
+    `<tr><td>p95 latency</td><td class="num muted">${f.p95n}</td><td class="num">${f.p95l}</td></tr>`;
+}
+document.querySelectorAll("#fault-seg button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("#fault-seg button").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active"); faultI=+b.dataset.i; showFault();
+}));
+
+function render(){
+  drawManifest(); drawBaseline(); drawChaos(); showFault();
+}
+AC.renderAll(render);
+AC.onThemeChange(render);
+</script>
+</body>
+</html>

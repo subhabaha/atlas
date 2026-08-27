@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Retrieval Strategy Benchmark · Day 3 Task 2</title>
+<meta name="description" content="Reference demo: five retrieval strategies on one corpus and gold set — dense fails on part numbers, sparse fails on paraphrase, and neither failure is visible in the answer.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../index.html"><span class="logo">AC</span><span>Advanced AI Engineering<small>Demo Gallery</small></span></a>
+    <span class="spacer"></span>
+    <nav>
+      <a href="../index.html">◂ All demos</a>
+      <a href="task3.html">Next: Three MCP Servers ▸</a>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">☾</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div class="crumbs"><a href="../index.html">Gallery</a> › Day 3 · Production-Grade RAG, MCP &amp; Observability › Task 2</div>
+    <div class="tags">
+      <span class="badge b-blue">Day 3 · Task 2</span>
+      <span class="badge">Lab 3</span>
+      <span class="badge tag-mods">MODULE 3 · DENSE VS SPARSE · HYBRID &amp; RRF · RERANKING · METADATA FILTERING · NO-ANSWER</span>
+    </div>
+    <h1>Retrieval Strategy Benchmark</h1>
+    <p class="tagline">Dense retrieval fails on part numbers. Sparse fails on paraphrase. Averaged over a mixed question set the
+      two look identical — and neither failure is visible in the answer. One corpus, one gold set, five strategies, one table
+      built to be shown to management with numbers on it.</p>
+  </div>
+
+  <!-- scenario -->
+  <section class="section" data-reveal>
+    <h2>The scenario</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <p>The corpus is <b>Corpus B</b> — 300 synthetic markdown service bulletins for an industrial air-compressor
+           organisation (product families <span class="mono">GA-30</span>, <span class="mono">GA-75</span>,
+           <span class="mono">ZR-160</span>), each with YAML front-matter: <span class="mono">doc_id, doc_type,
+           product_family, revision, status, access_level</span>. Retrieval quality is only measurable when you know which
+           passage is correct — so this corpus ships with a scoreboard the real manuals cannot give you.</p>
+        <p style="margin-bottom:0">The gold set is <b>60 questions</b>, class-labelled, because a mixed set is what exposes the
+           difference between strategies. Report every metric <em>per class</em> as well as overall.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:.6rem">The 60-question gold set</h3>
+        <dl class="kv">
+          <dt>Conceptual ×20</dt><dd>“why does discharge temp rise…”</dd>
+          <dt>Identifier ×20</dt><dd>“torque spec for HX-4471-B?”</dd>
+          <dt>Paraphrase ×10</dt><dd>worded unlike the source</dd>
+          <dt>Out-of-corpus ×10</dt><dd>genuinely not answerable</dd>
+          <dt>Each carries</dt><dd>the doc_id that answers it</dd>
+          <dt>context recall</dt><dd>needs no model — compute first</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- what to build -->
+  <section class="section" data-reveal>
+    <h2>What the attendees must build</h2>
+    <ul class="checklist grid-2 grid">
+      <li>Dense only — embeddings + FAISS</li>
+      <li>Sparse only — BM25</li>
+      <li>Hybrid — both, fused with Reciprocal Rank Fusion (k=60)</li>
+      <li>Hybrid + cross-encoder reranking (retrieve 30–50, cut to top 3–5)</li>
+      <li>Hybrid + reranking + metadata filter on <span class="mono">product_family</span> and <span class="mono">status=active</span></li>
+      <li>The deliverable table: five strategies × recall, precision, answer-correct, p95, tokens</li>
+      <li>The same table again, <b>broken down by question class</b> — where the argument lives</li>
+      <li>No-answer detection measured on the ten out-of-corpus questions, before and after</li>
+    </ul>
+  </section>
+
+  <!-- THE BENCHMARK -->
+  <section class="section" data-reveal>
+    <h2>The live benchmark</h2>
+
+    <div id="verdict" class="verdict v-ok" style="margin-bottom:1rem">
+      <span class="dot d-ok"></span>
+      <div>
+        <div class="vt">Hybrid + rerank + metadata filter — recall 0.93 · precision 0.88 · answer-correct 0.90</div>
+        <div class="vs">Reranking added <b>220&nbsp;ms</b> and <b>25 points</b> of precision while cutting tokens per query <b>41%</b>. No-answer detection took declines from 0/10 to 9/10.</div>
+      </div>
+    </div>
+
+    <!-- strategy table -->
+    <div class="card">
+      <div class="chart-title">The deliverable — five strategies, one table</div>
+      <div class="chart-sub">Identical corpus, identical 60 questions, one variable changed at a time. Cost and latency reported alongside quality for <em>every</em> strategy, not only the winner.</div>
+      <div class="table-wrap" style="margin-top:.6rem">
+        <table class="data">
+          <thead><tr><th>Strategy</th><th class="num">Context recall</th><th class="num">Context precision</th><th class="num">Answer correct</th><th class="num">p95 latency</th><th class="num">Tokens / query</th></tr></thead>
+          <tbody>
+            <tr><td>Dense only <span class="muted">· FAISS</span></td><td class="num">0.71</td><td class="num">0.58</td><td class="num">0.63</td><td class="num">240 ms</td><td class="num">3,100</td></tr>
+            <tr><td>Sparse only <span class="muted">· BM25</span></td><td class="num">0.68</td><td class="num">0.55</td><td class="num">0.60</td><td class="num">90 ms</td><td class="num">3,050</td></tr>
+            <tr><td>Hybrid <span class="muted">· RRF</span></td><td class="num">0.86</td><td class="num">0.64</td><td class="num">0.76</td><td class="num">300 ms</td><td class="num">3,200</td></tr>
+            <tr><td>Hybrid + rerank</td><td class="num">0.90</td><td class="num">0.83</td><td class="num">0.85</td><td class="num">520 ms</td><td class="num">1,900</td></tr>
+            <tr style="font-weight:700"><td>+ metadata filter <span class="badge b-ok" style="margin-left:.3rem">best</span></td><td class="num">0.93</td><td class="num">0.88</td><td class="num">0.90</td><td class="num">540 ms</td><td class="num">1,850</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small" style="margin:.7rem 0 0"><b>Context recall</b> = fraction of questions whose gold passage appears in the
+        top-k. You know the gold doc_id for every question, so it needs no model and no judgement — compute it first: it is the
+        number that diagnoses the stage where most failures actually happen.</p>
+    </div>
+
+    <!-- per-class breakdown -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">The same table, broken down by question class — where the argument lives</div>
+          <div class="chart-sub">Answer-correct rate by class. Dense excels on conceptual and paraphrase; sparse excels on identifiers. Averaged together with no class breakdown, the two look similar and you learn nothing.</div>
+        </div>
+        <div class="seg" id="class-seg">
+          <button class="active" data-m="answer">Answer correct</button>
+          <button data-m="recall">Context recall</button>
+        </div>
+      </div>
+      <div id="class-chart"></div>
+      <div class="grid grid-3 keep2" style="margin-top:1rem">
+        <div class="metric accent-blue"><div class="label">Dense · identifier</div><div class="value sm" style="color:var(--bad)">0.42</div><div class="sub">plausible passage, wrong part</div></div>
+        <div class="metric accent-warn"><div class="label">Sparse · paraphrase</div><div class="value sm" style="color:var(--bad)">0.40</div><div class="sub">phrased unlike the document</div></div>
+        <div class="metric accent-ok"><div class="label">Hybrid · overall</div><div class="value sm">0.76</div><div class="sub">clearly better on a mixed set</div></div>
+      </div>
+    </div>
+
+    <!-- RRF formula + metadata toggle -->
+    <div class="grid grid-2" style="margin-top:1.1rem">
+      <div class="card">
+        <div class="chart-title">Reciprocal Rank Fusion — the whole of it</div>
+        <div class="chart-sub">Dense and sparse scores are not on comparable scales, so RRF ignores the scores entirely and uses only the ranks. It needs no tuning, which is most of why it is the default.</div>
+        <div class="callout" style="margin-top:.6rem;background:var(--surface-2)">
+          <p style="margin:0;font-family:var(--mono);font-size:.95rem;color:var(--ink)">
+            score(d) &nbsp;=&nbsp; Σ<sub>lists</sub> &nbsp; 1 / ( k + rank(d) )
+          </p>
+          <p style="margin:.5rem 0 0"><span class="mono">k = 60</span> by convention. A document ranked #1 in one list and #40 in
+            the other still fuses ahead of one ranked #5 in both — rank presence beats single-list dominance.</p>
+        </div>
+        <div class="table-wrap" style="margin-top:.8rem">
+          <table class="data">
+            <thead><tr><th>Doc</th><th class="num">dense rank</th><th class="num">sparse rank</th><th class="num">RRF score</th></tr></thead>
+            <tbody id="rrf-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="dash-toolbar">
+          <div>
+            <div class="chart-title">Metadata filter — the wrong-variant case</div>
+            <div class="chart-sub">A <span class="mono">GA-30</span> question, with a near-identical <span class="mono">GA-75</span> procedure in the corpus.</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="filter-toggle"><span class="track"></span>Filter <span class="mono">product_family=GA-30</span></label>
+        </div>
+        <div id="variant-panel"></div>
+        <p class="small" style="margin:.7rem 0 0"><b>Why it is underused.</b> It requires metadata captured at ingestion — Task&nbsp;1’s
+          level 4. Teams reach for a better embedding model instead, because that is a change they can make without revisiting
+          the pipeline. Frequently the largest single improvement available, and almost always deferred.</p>
+      </div>
+    </div>
+
+    <!-- no-answer + diagnosis -->
+    <div class="grid grid-2" style="margin-top:1.1rem">
+      <div class="card">
+        <div class="chart-title">No-answer detection — the ten out-of-corpus questions</div>
+        <div class="chart-sub">Without detection, retrieval always returns its top matches however weak, the model answers anyway, and the user receives a fluent, confident, wrong answer — cited to a document that does not support it.</div>
+        <div class="grid grid-2" style="margin-top:.8rem">
+          <div style="text-align:center">
+            <div id="na-before"></div>
+            <div class="chart-sub" style="margin-top:.4rem"><span class="badge b-bad">Before</span> declined 0 / 10</div>
+          </div>
+          <div style="text-align:center">
+            <div id="na-after"></div>
+            <div class="chart-sub" style="margin-top:.4rem"><span class="badge b-ok">After</span> declined 9 / 10</div>
+          </div>
+        </div>
+        <p class="small" style="margin:.8rem 0 0">Implemented as two things together: a <b>threshold on the reranker score</b>, and an
+          explicit instruction that the model answer only from the provided passages and say so when they are insufficient.
+          Declining to answer is a feature, not a failure.</p>
+      </div>
+
+      <div class="card">
+        <div class="chart-title">Two numbers, one diagnosis</div>
+        <div class="chart-sub">Take a residual failure and read it against context recall and faithfulness. This converts “the RAG system gives bad answers” into a specific stage in one step. The overwhelming majority land in the first row.</div>
+        <div class="table-wrap" style="margin-top:.6rem">
+          <table class="data">
+            <thead><tr><th>Recall</th><th>Faithfulness</th><th>Diagnosis</th><th>What to fix</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge b-bad">low</span></td><td class="muted">—</td><td>Retrieval failed — the answer never had a chance</td><td class="muted">chunking, hybrid, reranking, metadata</td></tr>
+              <tr><td><span class="badge b-ok">high</span></td><td><span class="badge b-bad">low</span></td><td>Right passages found and ignored</td><td class="muted">grounding, citation enforcement</td></tr>
+              <tr><td><span class="badge b-ok">high</span></td><td><span class="badge b-ok">high</span>, still wrong</td><td>Source document is outdated</td><td class="muted">versioning &amp; supersession</td></tr>
+              <tr><td><span class="badge b-ok">high</span></td><td><span class="badge b-ok">high</span>, correct</td><td>The system is working</td><td class="muted">measure cost/latency; examine slices</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- the trap -->
+  <section class="section" data-reveal>
+    <h2>The trap the average hides</h2>
+    <div class="callout bad">
+      <div class="k">Dense retrieval fails silently on identifiers</div>
+      <p style="margin:.3rem 0 0">Ask for the torque on <span class="mono">HX-4471-B</span> and a pure-embedding index returns a
+        plausible passage about a <em>different</em> part — because the identifier fragmented into meaningless sub-word tokens
+        (Task&nbsp;1) and the vector landed near semantically-similar neighbours. Answer-correct on identifier questions: <b>0.42</b>.
+        Nothing in the answer signals the miss.</p>
+    </div>
+    <div class="callout warn">
+      <div class="k">One average, two cancelling failures</div>
+      <p style="margin:.3rem 0 0">Dense overall 0.71, sparse overall 0.68 — nearly identical, and a report that stops there
+        recommends a coin flip. The class breakdown shows dense at 0.90 on conceptual / 0.42 on identifier, sparse the mirror
+        image. Report per class, or you learn nothing.</p>
+    </div>
+    <div class="callout">
+      <div class="k">A confident answer is not a grounded one</div>
+      <p style="margin:.3rem 0 0">Before no-answer detection the system declined 0 of 10 unanswerable questions and cited a
+        document for each. A citation to a document that does not support the claim is worse than no citation — the user checks,
+        sees a reference, and trusts it.</p>
+    </div>
+  </section>
+
+  <!-- lesson -->
+  <section class="section" data-reveal>
+    <div class="lesson">
+      <div class="k">The lesson this build makes undeniable</div>
+      <h3>Measure retrieval and generation separately, or you cannot tell which one failed.</h3>
+      <p style="margin-bottom:0">Context recall is a retrieval number computed with no model at all; faithfulness is a generation
+        number. When they disagree, the diagnosis is immediate. Most retrieval failures are retrieval failures — not model
+        failures, not prompt failures — and the fix is almost never a bigger embedding model.</p>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="chart-title">Defend your result</div>
+      <p style="margin:.5rem 0 0;font-style:italic;color:var(--ink)">“On identifier questions dense scored <b>0.42</b> and sparse
+        <b>0.90</b>; hybrid scored <b>0.86</b>. Reranking added <b>220&nbsp;ms</b> and <b>25 points</b> of precision while cutting
+        tokens by <b>41%</b>. Our system declined correctly on <b>0</b> of 10 out-of-corpus questions before we added detection,
+        and <b>9</b> of 10 afterwards.”</p>
+    </div>
+  </section>
+
+  <!-- pagenav -->
+  <nav class="pagenav">
+    <a href="task1.html"><div class="pn"><small>◂ Day 3 · Task 1</small><b>The Ingestion Bench</b></div></a>
+    <a href="task3.html"><div class="pn next"><small>Next ▸ Day 3 · Task 3</small><b>Three MCP Servers</b></div></a>
+  </nav>
+
+  <p class="note-sim" style="margin-top:2rem">All figures on this page are generated in your browser from a seeded simulator matching the task specification. No backend, no external calls. Latency and token figures are illustrative placeholders consistent with the task pack.</p>
+
+</main>
+
+<footer class="footer"><div class="footer-inner"><div>Atlas Copco · Advanced AI Engineering Bootcamp — Reference Demo Gallery</div><div class="small">Day 3 · Task 2</div></div></footer>
+
+<script src="../assets/charts.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+/* ---- per-class answer-correct / recall ------------------------------------ */
+const CLASS_DATA = {
+  answer: {
+    cats:["Conceptual","Identifier","Paraphrase","Out-of-corpus"],
+    dense:[0.90,0.42,0.85,0.10], sparse:[0.66,0.90,0.42,0.10], hybrid:[0.92,0.86,0.82,0.20]
+  },
+  recall: {
+    cats:["Conceptual","Identifier","Paraphrase","Out-of-corpus"],
+    dense:[0.93,0.48,0.88,0.00], sparse:[0.70,0.94,0.45,0.00], hybrid:[0.95,0.90,0.86,0.00]
+  }
+};
+let classMode = "answer";
+
+/* ---- RRF worked example --------------------------------------------------- */
+const RRF = [
+  ["GA30-BULL-207", 1, 8],
+  ["GA30-PROC-041", 3, 2],
+  ["GA75-PROC-039", 2, 14],
+  ["GA30-TS-118",   9, 4]
+].map(r=>{
+  const k=60; const s = 1/(k+r[1]) + 1/(k+r[2]);
+  return {doc:r[0], d:r[1], s2:r[2], score:s};
+}).sort((a,b)=>b.score-a.score);
+document.getElementById("rrf-body").innerHTML = RRF.map((r,i)=>
+  `<tr${i===0?' style="font-weight:700"':''}><td class="mono">${r.doc}</td><td class="num">${r.d}</td><td class="num">${r.s2}</td><td class="num">${r.score.toFixed(4)}${i===0?' ◂':''}</td></tr>`
+).join("");
+
+/* ---- metadata wrong-variant panel ----------------------------------------- */
+function renderVariant(){
+  const filtered = document.getElementById("filter-toggle").checked;
+  const el = document.getElementById("variant-panel");
+  if(!filtered){
+    el.innerHTML =
+      '<div class="callout bad" style="margin-top:.6rem"><div class="k">Without filter · top result</div>'+
+      '<p style="margin:.3rem 0 .4rem"><span class="mono">GA75-PROC-039</span> — “Coupling alignment, GA-75 skid” '+
+      '<span class="badge b-bad" style="margin-left:.3rem">wrong variant</span></p>'+
+      '<p style="margin:0">The GA-75 procedure is textually near-identical, ranks top, and the model answers with the '+
+      '<b>GA-75 shim thickness</b> to a GA-30 question. Confident, cited, wrong.</p></div>';
+  } else {
+    el.innerHTML =
+      '<div class="callout ok" style="margin-top:.6rem"><div class="k">With filter · top result</div>'+
+      '<p style="margin:.3rem 0 .4rem"><span class="mono">GA30-PROC-041</span> — “Coupling alignment, GA-30 skid” '+
+      '<span class="badge b-ok" style="margin-left:.3rem">correct variant</span></p>'+
+      '<p style="margin:0">The GA-75 document was <b>never a candidate</b> — the filter removed it before search. '+
+      'A hard ranking problem became an easy one by deletion.</p></div>';
+  }
+}
+document.getElementById("filter-toggle").addEventListener("change", renderVariant);
+
+/* ---- class seg ------------------------------------------------------------ */
+document.querySelectorAll("#class-seg button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("#class-seg button").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active"); classMode=b.dataset.m; render();
+}));
+
+/* ---- render --------------------------------------------------------------- */
+function render(){
+  const d = CLASS_DATA[classMode];
+  AC.bar(document.getElementById("class-chart"), {
+    h:300, dp:2, max:1, ticks:5,
+    groups:{ categories:d.cats, series:[
+      {name:"Dense",  color:"var(--c1)", values:d.dense},
+      {name:"Sparse", color:"var(--c3)", values:d.sparse},
+      {name:"Hybrid", color:"var(--c5)", values:d.hybrid}
+    ]}
+  });
+  AC.donut(document.getElementById("na-before"), {size:130, stroke:16, round:true,
+    segments:[{value:0,color:"var(--ok)"},{value:10,color:"var(--bad)"}], center:"0/10", centerSub:"declined"});
+  AC.donut(document.getElementById("na-after"), {size:130, stroke:16, round:true,
+    segments:[{value:9,color:"var(--ok)"},{value:1,color:"var(--bad)"}], center:"9/10", centerSub:"declined"});
+  renderVariant();
+}
+AC.renderAll(render);
+AC.onThemeChange(render);
+</script>
+</body>
+</html>

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ingestion Architecture · Day 2 Task 3</title>
+<meta name="description" content="Reference demo: two embedding-model versions in one index degrade retrieval silently — nothing errors, no alert fires. Eleven storage layers, data contracts that fail loudly, the embedding-version experiment, supersession latency and a lineage record you can reproduce.">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  .tree { font-family:var(--mono); font-size:.84rem; }
+  .layer-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.6rem; }
+  .lc { border:1px solid var(--border); border-radius:9px; padding:.65rem .8rem; background:var(--surface-2); position:relative; }
+  .lc .lc-id { font-family:var(--mono); font-size:.72rem; color:var(--ac-blue); font-weight:700; }
+  .lc .lc-name { font-weight:700; font-size:.9rem; color:var(--ink); margin:.1rem 0; }
+  .lc .lc-prop { font-size:.76rem; color:var(--ink-3); line-height:1.4; }
+  .vlog { font-family:var(--mono); font-size:.8rem; background:var(--surface-3); border:1px solid var(--border); border-radius:9px; padding:.8rem 1rem; line-height:1.7; overflow-x:auto; }
+  .vlog .ok { color:var(--ok); } .vlog .err { color:var(--bad); } .vlog .dim { color:var(--ink-3); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../index.html"><span class="logo">AC</span><span>Advanced AI Engineering<small>Demo Gallery</small></span></a>
+    <span class="spacer"></span>
+    <nav>
+      <a href="../index.html">◂ All demos</a>
+      <a href="task4.html">Next: Secure Retrieval ▸</a>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">☾</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div class="crumbs"><a href="../index.html">Gallery</a> › Day 2 · Architecture, Data &amp; Security › Task 3</div>
+    <div class="tags">
+      <span class="badge b-blue">Day 2 · Task 3</span>
+      <span class="badge">Lab 3</span>
+      <span class="badge tag-mods">MODULE 3 · ELEVEN STORAGE LAYERS · DATA CONTRACTS · LINEAGE · SUPERSESSION · EMBEDDING VERSIONS</span>
+    </div>
+    <h1>Ingestion Architecture</h1>
+    <p class="tagline">Two embedding-model versions in one index degrade retrieval <strong>silently</strong> — nothing errors, no alert fires. Both
+      models output 1,536 dimensions, so mixing them raises no exception at all. Retrieval simply gets worse, and diagnosing it months later is
+      genuinely hard.</p>
+  </div>
+
+  <!-- scenario -->
+  <section class="section" data-reveal>
+    <h2>The scenario</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <p>Three kinds of data arrive by three routes — technical documents, telemetry, feedback — and each needs a different answer to the same
+           four questions: <b>where does it live, how is it versioned, who may see it, how long is it kept?</b> You build it as a working pipeline, not a
+           diagram, and in the middle you meet the most expensive silent failure in enterprise retrieval.</p>
+        <p style="margin-bottom:0">The corpus: <b>300 synthetic service bulletins and procedures</b> for the GA-30, GA-75 and ZR-160 families, with a
+           <b>40-question gold set</b> naming the document that answers each. Retrieval quality must be measurable against known-correct answers.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:.6rem">Two embedding deployments — the trap, by design</h3>
+        <dl class="kv">
+          <dt>v1</dt><dd>text-embedding-ada-002 · 1,536 dim</dd>
+          <dt>v2</dt><dd>text-embedding-3-small · 1,536 dim</dd>
+          <dt>Why it hides</dt><dd>Same dimensions ⇒ no error when mixed</dd>
+          <dt>Reality</dt><dd>Different vector spaces ⇒ distances meaningless</dd>
+          <dt>Offline eq.</dt><dd>MiniLM-L6 &amp; L12, both 384 dim</dd>
+          <dt>Rule</dt><dd>Record model version per vector; treat a model change as a full re-index</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- what to build -->
+  <section class="section" data-reveal>
+    <h2>What the attendees must build</h2>
+    <ul class="checklist grid-2 grid">
+      <li>All eleven storage layers as <b>separate locations</b>, each with its key property stated</li>
+      <li>A JSON-Schema data contract per data type, enforced at ingestion, that <b>fails loudly</b></li>
+      <li>At least five of eight quality checks: completeness, validity, consistency, uniqueness, freshness</li>
+      <li>A deliberately corrupted batch rejected with a message <b>naming the violated contract</b></li>
+      <li>Recall@5 plotted against the proportion of mixed-version content, with the fix applied and recovery shown</li>
+      <li><span class="mono">embedding_model_version</span> recorded on every vector; a model change budgeted as a re-index</li>
+      <li>Supersession latency measured, and the freshness contract stated</li>
+      <li>One earlier answer reproduced exactly, from the lineage record alone</li>
+    </ul>
+  </section>
+
+  <!-- eleven layers -->
+  <section class="section" data-reveal>
+    <h2>The eleven storage layers — as real directories</h2>
+    <p class="small" style="margin-top:-.4rem">A layer you cannot point at does not exist. Pick any object the pipeline creates and name which of the
+      eleven it belongs to; if you cannot, it is probably in three of them inconsistently — and one of the three is somebody's laptop.</p>
+    <div class="card">
+      <div class="layer-cards" id="layer-cards"></div>
+    </div>
+  </section>
+
+  <!-- data contracts -->
+  <section class="section" data-reveal>
+    <h2>Data contracts that fail loudly</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="chart-title">A corrupted batch, rejected at ingestion</div>
+        <div class="chart-sub">A teammate corrupts a batch four ways. The pipeline rejects it and says which contract each row violated — converting a silent quality failure into a loud pipeline failure.</div>
+        <div class="vlog" style="margin-top:.6rem">
+<span class="dim"># validate --contract telemetry.schema.json --batch 2020-08-17.parquet</span><br>
+<span class="err">REJECT</span> row 118 · <span class="err">validity</span> · Oil_temperature=4000.0 &gt; max 150 °C<br>
+<span class="err">REJECT</span> batch · <span class="err">schema</span> · field <span class="err">"reservoir_bar"</span> unknown (renamed from Reservoirs)<br>
+<span class="err">REJECT</span> doc GA75-TB-0091 · <span class="err">completeness</span> · body truncated mid-sentence, 512 B<br>
+<span class="err">REJECT</span> batch · <span class="err">uniqueness</span> · 50 duplicate records (doc_id + revision)<br>
+<span class="dim">— batch refused · 0 rows admitted · contract: telemetry v3, docs v2</span>
+        </div>
+        <p class="small" style="margin:.7rem 0 0">An AI system without this absorbs the malformed input, produces a confident wrong answer, and nobody notices for weeks.
+          A rejected batch is a bad morning; a month of quietly degraded answers is a bad quarter.</p>
+      </div>
+      <div class="card">
+        <div class="chart-title">Quality checks — five of eight implemented</div>
+        <div class="chart-sub">The three not yet built are marked planned, not forgotten.</div>
+        <div class="pill-row" style="margin:.8rem 0 1rem">
+          <span class="badge b-ok">✓ Completeness</span>
+          <span class="badge b-ok">✓ Validity</span>
+          <span class="badge b-ok">✓ Consistency</span>
+          <span class="badge b-ok">✓ Uniqueness</span>
+          <span class="badge b-ok">✓ Freshness</span>
+          <span class="badge b-warn">Distribution · planned</span>
+          <span class="badge b-warn">Referential integ. · planned</span>
+          <span class="badge b-warn">Label quality · planned</span>
+        </div>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Data type</th><th>Contract</th><th>Access</th><th>Retention</th></tr></thead>
+            <tbody>
+              <tr><td>Documents</td><td class="mono">docs.schema.json</td><td>public/internal/restricted</td><td>indefinite</td></tr>
+              <tr><td>Telemetry</td><td class="mono">telemetry.schema.json</td><td>internal</td><td>raw 90 d · features 2 y</td></tr>
+              <tr><td>Feedback</td><td class="mono">feedback.schema.json</td><td>internal</td><td>joined to request id</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CENTREPIECE embedding experiment -->
+  <section class="section" data-reveal>
+    <h2>The centrepiece — the embedding-version experiment</h2>
+
+    <div id="embed-verdict" class="verdict v-bad" style="margin-bottom:1rem">
+      <span class="dot d-bad"></span>
+      <div>
+        <div class="vt" id="ev-title">At 50% v2 content, Recall@5 has fallen from 0.90 to 0.68 — with no error and no alert</div>
+        <div class="vs" id="ev-sub">Some questions get worse, most are fine, and nothing in the logs changed. The symptom is diffuse. This is why an embedding-model change must be treated as a full re-index.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="dash-toolbar">
+        <div>
+          <div class="chart-title">Recall@5 vs the proportion of v2-embedded content</div>
+          <div class="chart-sub">Embed all 300 docs with v1, measure the baseline. Add v2-embedded docs into the same index, as a real team would when a better model ships. Re-measure at each stage on the same 40 gold questions.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="fix-toggle"><span class="track"></span>Apply the fix (version-tagged vectors · re-embed)</label>
+      </div>
+      <div class="grid grid-4 keep2" style="margin-bottom:1rem">
+        <div class="metric accent-bad"><div class="label">Recall@5 now</div><div class="value" id="m-recall">0.68</div><div class="sub" id="m-recall-sub">mixed index</div></div>
+        <div class="metric"><div class="label">Drop from baseline</div><div class="value sm" id="m-drop">−0.22</div><div class="sub">0.90 baseline</div></div>
+        <div class="metric"><div class="label">v2 share</div><div class="value sm" id="m-share">50%</div><div class="sub" id="m-share-sub">150 of 400 vectors</div></div>
+        <div class="metric"><div class="label">Re-index cost</div><div class="value sm">12 min</div><div class="sub">400 docs re-embedded</div></div>
+      </div>
+      <div class="control" style="min-width:100%;margin:0 0 1rem">
+        <label for="share">v2 share of the index <span class="readout" id="share-read">50%</span></label>
+        <input type="range" id="share" min="0" max="3" value="3" step="1">
+        <div class="small" style="display:flex;justify-content:space-between;margin-top:.2rem"><span>0%</span><span>10%</span><span>30%</span><span>50%</span></div>
+      </div>
+      <div id="recall-chart"></div>
+      <div class="callout" style="margin-top:1rem;background:var(--surface-2)">
+        <div class="k">Why it is dangerous</div>
+        <p class="small" style="margin:.2rem 0 0">An embedding is only meaningful relative to the model that produced it. Two models with the same output
+          dimensions produce vectors in different spaces; distances between them are meaningless. No exception is raised. The fix: record
+          <span class="mono">embedding_model_version</span> on every vector, then split into per-version indexes or re-embed everything with one model — restoring
+          Recall@5 to the <b>0.90</b> baseline at a re-index cost of <b>400 documents · ~12 minutes</b>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- supersession + lineage -->
+  <section class="section" data-reveal>
+    <h2>Supersession latency &amp; lineage</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="chart-title">Supersession — how fast a withdrawn procedure stops being cited</div>
+        <div class="chart-sub">Ask a question answered by a soon-superseded procedure; publish the superseding document through the ingestion path; ask again and measure the time until the withdrawn one is no longer cited.</div>
+        <div class="grid grid-2 keep2" style="margin:.6rem 0 1rem">
+          <div class="metric accent-ok"><div class="label">Event-driven ingest</div><div class="value">45 s</div><div class="sub">stops citing withdrawn doc</div></div>
+          <div class="metric accent-bad"><div class="label">Nightly batch</div><div class="value">≤ 24 h</div><div class="sub">fails the safety contract</div></div>
+        </div>
+        <div id="fresh-chart"></div>
+        <div class="callout warn" style="margin-top:.9rem">
+          <div class="k">The freshness contract</div>
+          <p class="small" style="margin:.2rem 0 0">“For service manuals, nightly batch is fine. For a procedure just withdrawn by a <b>safety notice</b>, it is not —
+            because a system confidently citing a withdrawn procedure is considerably worse than one that finds nothing at all.” Safety notices route through
+            event-driven ingestion; the rest batch overnight.</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chart-title">Lineage — reproduce one earlier answer exactly</div>
+        <div class="chart-sub">The facilitator picks an answer from earlier in the lab and asks you to reproduce it. Most teams cannot. Every answer records the full version set.</div>
+        <div class="table-wrap" style="margin-top:.6rem">
+          <table class="data">
+            <thead><tr><th>Artefact</th><th>Version pinned</th></tr></thead>
+            <tbody>
+              <tr><td>Source documents</td><td class="mono">GA75-MP-0043 r4 · GA75-TB-0088 r2</td></tr>
+              <tr><td>Transform (chunker)</td><td class="mono">chunk-v3 · 800/120 tokens</td></tr>
+              <tr><td>Embedding model</td><td class="mono">text-embedding-3-small (v2)</td></tr>
+              <tr><td>Index</td><td class="mono">idx-2020-07-15T02:14Z</td></tr>
+              <tr><td>Prompt</td><td class="mono">answer.md@v7</td></tr>
+              <tr><td>Model</td><td class="mono">gpt-4o-mini@2024-07-18</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small" style="margin:.7rem 0 0">Discovering you cannot reproduce an answer in a workshop costs an afternoon; discovering it in an audit costs
+          considerably more.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- lesson -->
+  <section class="section" data-reveal>
+    <div class="lesson">
+      <div class="k">The lesson this build makes undeniable</div>
+      <h3>Silent degradation is worse than a crash, because nobody is paged for it.</h3>
+      <p style="margin-bottom:0">A traditional pipeline fails loudly when a schema changes; an AI system absorbs the malformed input and answers confidently
+        wrong. Validation at ingestion, a model version on every vector, and a lineage record are the three controls that turn silent quality failures into loud,
+        catchable ones — and the embedding-version experiment shows exactly what silence costs.</p>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="chart-title">Defend your result</div>
+      <p style="margin:.5rem 0 0;font-style:italic;color:var(--ink)">“Mixing two embedding versions cost us <b>0.22</b> points of Recall@5 at <b>50%</b> mixed content,
+        with no error and no alert. We detected it by re-running the gold set against the proportion of v2 content, and fixed it by tagging every vector with its
+        <b>embedding_model_version</b> and re-embedding — a re-index of <b>400 docs in ~12 minutes</b>. Our freshness contract for safety notices is event-driven
+        ingestion, which rules out nightly batch.”</p>
+    </div>
+  </section>
+
+  <!-- pagenav -->
+  <nav class="pagenav">
+    <a href="task2.html"><div class="pn"><small>◂ Day 2 · Task 2</small><b>The Nineteen Layers</b></div></a>
+    <a href="task4.html"><div class="pn next"><small>Next ▸ Day 2 · Task 4</small><b>Secure Retrieval, Three Roles</b></div></a>
+  </nav>
+
+  <p class="note-sim" style="margin-top:2rem">All figures on this page are generated in your browser from a seeded simulator matching the Task 3 specification. No backend, no external calls. Recall and cost figures are illustrative placeholders consistent with the task pack.</p>
+
+</main>
+
+<footer class="footer"><div class="footer-inner"><div>Atlas Copco · Advanced AI Engineering Bootcamp — Reference Demo Gallery</div><div class="small">Day 2 · Task 3</div></div></footer>
+
+<script src="../assets/charts.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+/* ---------- Eleven layers --------------------------------------------- */
+const LAYERS = [
+  ["01","raw","Exactly as received. Immutable. Never edited."],
+  ["02","cleaned","Validated, deduplicated, schema-conformant."],
+  ["03","features","One definition, used by training and serving."],
+  ["04","embeddings","Vectors, each carrying the model version that produced it."],
+  ["05","index","Rebuildable search structure with filterable metadata."],
+  ["06","metadata","Source, version, access level, dates."],
+  ["07","ground_truth","The gold set, versioned, with provenance per item."],
+  ["08","feedback","Joinable to the original request id."],
+  ["09","audit","Append-only. Never rewritten."],
+  ["10","models","Artefacts, versioned alongside the data that produced them."],
+  ["11","prompts","Prompts, policies and Skill definitions, reviewed like code."]
+];
+document.getElementById("layer-cards").innerHTML = LAYERS.map(l=>`
+  <div class="lc"><div class="lc-id">${l[0]}_${l[1]}/</div><div class="lc-name">${l[1]}</div><div class="lc-prop">${l[2]}</div></div>`).join("");
+
+/* ---------- Embedding-version experiment ------------------------------ */
+const SHARES = [0,10,30,50];
+const MIXED = [0.90,0.86,0.78,0.68];   // recall declines with v2 share, mixed index
+const BASE  = 0.90;
+let shareIdx = 3, fixed = false;
+
+function drawRecall(){
+  const share = SHARES[shareIdx];
+  const recall = fixed ? BASE : MIXED[shareIdx];
+  document.getElementById("share-read").textContent = share+"%";
+  document.getElementById("m-recall").textContent = recall.toFixed(2);
+  document.getElementById("m-recall-sub").textContent = fixed ? "fixed · version-tagged" : "mixed index";
+  document.getElementById("m-drop").textContent = (recall-BASE>=0?"±0.00":(recall-BASE).toFixed(2));
+  document.getElementById("m-share").textContent = share+"%";
+  document.getElementById("m-share-sub").textContent = Math.round(share/100*300)+" of "+(share>0?400:300)+" vectors";
+  // verdict
+  const v=document.getElementById("embed-verdict"), t=document.getElementById("ev-title"), s=document.getElementById("ev-sub");
+  const mrs=document.getElementById("m-recall").parentElement;
+  if(fixed){
+    v.className="verdict v-ok"; t.textContent="Fixed — Recall@5 restored to 0.90 by tagging every vector with its embedding model version";
+    s.textContent="Split into per-version indexes or re-embed everything with one model. Re-index cost: 400 documents, ~12 minutes — budgeted like the migration it is.";
+    mrs.className="metric accent-ok";
+  } else if(share===0){
+    v.className="verdict v-ok"; t.textContent="Baseline — all 300 documents embedded with v1, Recall@5 = 0.90";
+    s.textContent="One model, one vector space. This is the number every later stage is measured against.";
+    mrs.className="metric accent-ok";
+  } else {
+    v.className="verdict v-bad";
+    t.textContent="At "+share+"% v2 content, Recall@5 has fallen from 0.90 to "+recall.toFixed(2)+" — with no error and no alert";
+    s.textContent="Some questions get worse, most are fine, and nothing in the logs changed. The symptom is diffuse. This is why an embedding-model change must be treated as a full re-index.";
+    mrs.className="metric accent-bad";
+  }
+  // chart: mixed declining line + fixed flat line + current marker
+  const mixedPts = SHARES.map((sh,i)=>[sh,MIXED[i]]);
+  const fixedPts = SHARES.map(sh=>[sh,BASE]);
+  AC.line(document.getElementById("recall-chart"), {
+    h:280, xmin:0, xmax:50, ymin:0.5, ymax:1.0, legend:true,
+    xticks:SHARES.map(sh=>({v:sh,label:sh+"%"})), xlabel:"Proportion of v2-embedded content", yfmt:v=>v.toFixed(2),
+    series:[
+      {name:"Mixed index (silent decay)", color:"var(--c6)", points:mixedPts, dots:true, dotR:3.5, width:2.4},
+      {name:"Fixed — version-tagged / re-embedded", color:"var(--c5)", points:fixedPts, dashed:true, width:2}
+    ],
+    markers:[{x:share, y:recall, color:fixed?"var(--c5)":"var(--ac-blue)", r:6, shape:"circle", label:recall.toFixed(2)}],
+    hlines:[{y:BASE, color:"var(--ink-3)", label:"baseline 0.90", dashed:true}]
+  });
+}
+document.getElementById("share").addEventListener("input",e=>{ shareIdx=+e.target.value; drawRecall(); });
+document.getElementById("fix-toggle").addEventListener("change",e=>{ fixed=e.target.checked; drawRecall(); });
+
+/* ---------- Supersession freshness bar -------------------------------- */
+function drawFresh(){
+  AC.bar(document.getElementById("fresh-chart"), { h:160, horizontal:true, min:0, max:100, ticks:4, dp:0,
+    vfmt:v=>v>=60?"24h":v+"m",
+    data:[
+      {label:"Event-driven", value:2, color:"var(--c5)"},
+      {label:"CDC", value:9, color:"var(--c2)"},
+      {label:"Streaming", value:18, color:"var(--c3)"},
+      {label:"Nightly batch", value:90, color:"var(--c6)"}
+    ], valueLabels:false });
+}
+
+function render(){ drawRecall(); drawFresh(); }
+AC.renderAll(render);
+AC.onThemeChange(render);
+</script>
+</body>
+</html>

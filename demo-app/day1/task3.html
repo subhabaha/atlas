@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Failure Taxonomy &amp; Hypothesis Backlog Console · Day 1 Task 3</title>
+<meta name="description" content="Reference demo: where four engineers disagree, no model can learn a boundary. Inter-annotator agreement, Pareto and cost-weighting on real maintenance short text, ending in a ranked hypothesis backlog.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../index.html"><span class="logo">AC</span><span>Advanced AI Engineering<small>Demo Gallery</small></span></a>
+    <span class="spacer"></span>
+    <nav>
+      <a href="../index.html">◂ All demos</a>
+      <a href="task4.html">Next: Production Readiness Review ▸</a>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">☾</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-head">
+    <div class="crumbs"><a href="../index.html">Gallery</a> › Day 1 · Accuracy Engineering › Task 3</div>
+    <div class="tags">
+      <span class="badge b-blue">Day 1 · Task 3</span>
+      <span class="badge">Lab 3</span>
+      <span class="badge tag-mods">MODULE 3 · INTER-ANNOTATOR AGREEMENT · PARETO · SLICE ANALYSIS · COST WEIGHTING</span>
+    </div>
+    <h1>Failure Taxonomy &amp; Hypothesis Backlog Console</h1>
+    <p class="tagline">Where four qualified engineers disagree on the category, <strong>no model can learn a boundary that is
+      not there.</strong> The disagreement is not noise to be cleaned — it is the deliverable, and it sets a hard ceiling on
+      everything you build downstream.</p>
+  </div>
+
+  <!-- ---------------------------------------------------------- scenario -->
+  <section class="section" data-reveal>
+    <h2>The scenario</h2>
+    <div class="grid grid-2">
+      <div class="card">
+        <p>The installed-base service organisation closes thousands of work orders a year, each carrying a few words of free text
+           written by an engineer standing next to a machine. Somewhere in that text is the ranked list of what is actually going
+           wrong — and <strong>nobody has ever counted it</strong>, because counting it requires agreeing what the categories are.</p>
+        <p style="margin-bottom:0">Your team builds the console that does the counting, and discovers early that four qualified
+           engineers do not agree on the categories either. That discovery <em>is</em> the deliverable.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:.6rem">The corpus <span class="note-sim">(MaintIE, UWA · MIT licence)</span></h3>
+        <dl class="kv">
+          <dt>Source</dt><dd>MaintIE gold_release.json</dd>
+          <dt>Sampled</dt><dd>200 short texts (seed 11)</dd>
+          <dt>Overlap set</dt><dd>40 records, all 4 annotators</dd>
+          <dt>Character</dt><dd>abbreviations, missing verbs</dd>
+          <dt>Taxonomy</dt><dd>8 categories + "unclear"</dd>
+          <dt>Written</dt><dd>before reading the data</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- what to build -->
+  <section class="section" data-reveal>
+    <h2>What the attendees must build</h2>
+    <ul class="checklist grid-2 grid">
+      <li>Fleiss' kappa across four annotators, with the interpretation band it falls in</li>
+      <li>Pairwise Cohen's kappa as a 4×4 matrix, and the category-pair disagreement matrix</li>
+      <li>The "unclear" rate, and the count of contested (2–2 split) records as a headline number</li>
+      <li>Model-vs-human kappa — <b>not</b> accuracy — because the model labels confidently where humans split</li>
+      <li>Two Pareto charts: frequency and cost-weighted, with the cost table on screen</li>
+      <li>Headroom for the top three categories, with the volume assumption stated</li>
+      <li>A ranked hypothesis backlog scored expected gain × confidence ÷ effort</li>
+      <li>The sentence: a classifier's ceiling ≈ the annotator agreement, so a 90% target is incoherent</li>
+    </ul>
+  </section>
+
+  <!-- ---------------------------------------------------------- THE CONSOLE -->
+  <section class="section" data-reveal>
+    <h2>The live console</h2>
+
+    <!-- agreement headline -->
+    <div class="grid grid-4 keep2" style="margin-bottom:1.1rem">
+      <div class="metric accent-warn big"><div class="label">Fleiss' κ · 4 annotators</div><div class="value">0.52</div><div class="ci">moderate (0.41–0.60)</div></div>
+      <div class="metric"><div class="label">"unclear" rate</div><div class="value sm">12%</div><div class="sub">24 of 200 · below the 15% alarm line</div></div>
+      <div class="metric accent-bad"><div class="label">Contested (2–2 splits)</div><div class="value sm">7</div><div class="sub">of 40 overlap records · no consensus</div></div>
+      <div class="metric"><div class="label">Model vs human κ</div><div class="value sm">0.38</div><div class="sub">fair — and it never says "unclear"</div></div>
+    </div>
+
+    <div class="callout warn">
+      <div class="k">The strongest single argument in the entire Day 1 assignment</div>
+      <p style="margin:.3rem 0 0">"Our four engineers agree at <b>κ 0.52</b>. Any classifier trained on this labelling has a realistic
+        ceiling around that level, so a <b>90% accuracy target is not ambitious — it is incoherent</b>, because it asks the model to be
+        more consistent than the ground truth it learns from."</p>
+    </div>
+
+    <!-- agreement matrices -->
+    <div class="grid grid-2" style="margin-top:1.1rem">
+      <div class="card">
+        <div class="chart-title">Pairwise Cohen's κ · the four annotators</div>
+        <div class="chart-sub">Every pair lands in "moderate". No two engineers are a reference standard for the others — the
+          boundary is genuinely contested, not one person being careless.</div>
+        <div id="cohen-chart" style="margin-top:.4rem"></div>
+      </div>
+      <div class="card">
+        <div class="chart-title">Category-pair disagreement matrix</div>
+        <div class="chart-sub">Where annotators split, and how often. Two pairs dominate: <b>seal/leak ↔ lubrication/oil</b>
+          (both are fluid on the floor) and <b>bearing/rotating ↔ fastening/alignment</b> (both present as vibration). Fix those two
+          definitions and most of the disagreement goes.</div>
+        <div id="disagree-chart" style="margin-top:.4rem;overflow-x:auto"></div>
+      </div>
+    </div>
+
+    <div class="callout bad" style="margin-top:1.1rem">
+      <div class="k">Confidence is not agreement — the trap in this task</div>
+      <p style="margin:.3rem 0 0">The model returns clean, confident, well-formatted categories for all 200 records — including the
+        <b>7 the humans could not agree on</b>. It says "unclear" on ~1% of records where the humans said it on 12%. Look specifically
+        where humans split: that is where the model's answer is least trustworthy and most likely to be accepted without challenge,
+        because it arrives without hesitation. <em>An annotator that never says "unclear" on genuinely unclear text is not a good
+        annotator — it is a fast one.</em></p>
+    </div>
+
+    <!-- pareto -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="chart-title">Count, then weight by cost — two Pareto charts, different top two</div>
+      <div class="chart-sub">Frequency alone misleads; frequency × impact is the ranking that survives a budget conversation.
+        The most frequent category is rarely the most expensive one, and a backlog built from raw counts sends engineering effort to
+        the wrong place.</div>
+      <div class="grid grid-2" style="margin-top:.7rem">
+        <div>
+          <div class="chart-sub">Frequency Pareto — work orders per category (unclear counted, never costed)</div>
+          <div id="freq-chart"></div>
+          <p class="small" style="margin:.5rem 0 0">Top two by count: <b>seal/leak (42)</b>, <b>bearing (30)</b>.</p>
+        </div>
+        <div>
+          <div class="chart-sub">Cost-weighted Pareto — frequency × cost per occurrence (unclear excluded)</div>
+          <div id="cost-chart"></div>
+          <p class="small" style="margin:.5rem 0 0">Top two by cost: <b>bearing (€204k)</b>, <b>electrical (€81k)</b>. The lists disagree.</p>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:1rem">
+        <table class="data">
+          <thead><tr><th>Category</th><th class="num">Count</th><th class="num">Cost / occurrence</th><th class="num">Weighted</th><th>Why</th></tr></thead>
+          <tbody id="cost-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- headroom -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="chart-title">Headroom — top three categories by cost weight</div>
+      <div class="chart-sub">Volume assumption, stated on the dashboard: <b>4,000 relevant work orders per year</b> across the installed
+        base (the 200-record sample scaled ×20). "Headroom" = the annual spend if this category were eliminated entirely.</div>
+      <div class="grid grid-3 keep2" style="margin-top:.7rem">
+        <div class="metric accent-bad"><div class="label">Bearing / rotating</div><div class="value sm">€ 4.08M</div><div class="sub">600 WO/yr × €6,800 — work this first</div></div>
+        <div class="metric accent-warn"><div class="label">Electrical &amp; control</div><div class="value sm">€ 1.61M</div><div class="sub">520 WO/yr × €3,100</div></div>
+        <div class="metric accent-blue"><div class="label">Seal / leak</div><div class="value sm">€ 1.26M</div><div class="sub">840 WO/yr × €1,500 — most common, not most costly</div></div>
+      </div>
+    </div>
+
+    <!-- backlog -->
+    <div class="card" style="margin-top:1.1rem">
+      <div class="chart-title">Ranked hypothesis backlog</div>
+      <div class="chart-sub">Every finding converted to an experiment, scored <b>expected gain × confidence ÷ effort</b>. At least one
+        labelling/definition hypothesis, at least one data-collection hypothesis, at most one modelling hypothesis. A backlog that is all
+        modelling means Module 3 was not understood.</div>
+      <div class="grid grid-2" style="margin-top:.7rem">
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>#</th><th>Hypothesis</th><th>Type</th><th class="num">Gain</th><th class="num">Conf</th><th class="num">Effort</th><th class="num">Score</th></tr></thead>
+            <tbody id="backlog-body"></tbody>
+          </table>
+        </div>
+        <div>
+          <div class="chart-sub">Priority score (gain × conf ÷ effort)</div>
+          <div id="backlog-chart"></div>
+        </div>
+      </div>
+      <div class="callout ok" style="margin-top:1rem">
+        <div class="k">Worked example — the highest-priority row</div>
+        <p style="margin:.3rem 0 0">Rewriting the definitions for the two most-confused categories (seal/leak vs lubrication/oil)
+          is estimated to raise inter-annotator agreement from <b>κ 0.52 to 0.70</b> — from "moderate" to "substantial", usable ground
+          truth — in three days. No model change touches the ceiling; this does. That is why it outscores everything below it.</p>
+      </div>
+    </div>
+
+    <!-- verdict -->
+    <div class="verdict v-warn" style="margin-top:1.1rem">
+      <span class="dot d-warn"></span>
+      <div>
+        <div class="vt">FIX THE TAXONOMY BEFORE THE MODEL — the boundary does not exist yet</div>
+        <div class="vs">At κ 0.52 the labels cap any classifier near 0.52 consistency. Work <b>bearing/rotating</b> first (€4.08M/yr
+          headroom) though <b>seal/leak</b> is the most common. Spend the first three days rewriting the two most-confused definitions to
+          lift κ to 0.70 — a data-and-definition move, not a modelling one.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- the trap -->
+  <section class="section" data-reveal>
+    <h2>The traps this console exposes</h2>
+    <div class="callout bad">
+      <div class="k">Chasing accuracy above the agreement ceiling</div>
+      <p style="margin:.3rem 0 0">A model cannot be more consistent than the labels it is trained on. At κ 0.52, a 90% target asks the
+        classifier to resolve boundaries four qualified humans could not. Effort spent on the model there is spent below the ceiling; the
+        ceiling itself moves only when the definitions do.</p>
+    </div>
+    <div class="callout warn">
+      <div class="k">Ranking a backlog by raw count</div>
+      <p style="margin:.3rem 0 0">Seal/leak is the most frequent category and bearing is the most expensive. A backlog built from counts
+        sends engineers to seal/leak and leaves €4M of bearing failures untouched. Frequency × impact is the only ranking that survives
+        contact with a budget.</p>
+    </div>
+    <div class="callout">
+      <div class="k">Costing the "unclear" bucket</div>
+      <p style="margin:.3rem 0 0">A large unclear bucket is a defect in your taxonomy. Fold it into a euro figure and you hide exactly the
+        thing you need to see. Report it as a count, always — never as a cost.</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- lesson -->
+  <section class="section" data-reveal>
+    <div class="lesson">
+      <div class="k">The lesson this build makes undeniable</div>
+      <h3>A classifier's realistic ceiling is the agreement of the people who labelled it.</h3>
+      <p style="margin-bottom:0">Measure inter-annotator agreement before you measure a model. If four engineers agree at κ 0.52, that
+        is the ceiling — and the cheapest, highest-value work is not a bigger model but rewriting the two definitions that cause most of
+        the disagreement. Data and definitions move the ceiling; models only approach it.</p>
+    </div>
+    <div class="card" style="margin-top:1rem">
+      <div class="chart-title">Defend your result</div>
+      <p style="margin:.5rem 0 0;font-style:italic;color:var(--ink)">"Our four engineers agree at <b>κ 0.52</b>. Ranked by count the top
+        problem is <b>seal/leak</b>; ranked by cost it is <b>bearing/rotating</b>. We would work on <b>bearing/rotating</b> first, worth
+        roughly <b>€ 4.08M a year</b>, and we would not chase seal/leak despite it being the most common. First, though, we rewrite the two
+        most-confused definitions to lift agreement from <b>0.52 to 0.70</b> — because no model beats its labels."</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- pagenav -->
+  <nav class="pagenav">
+    <a href="task2.html"><div class="pn"><small>◂ Prev · Day 1 · Task 2</small><b>Failure-Prediction Operating-Point Studio</b></div></a>
+    <a href="task4.html"><div class="pn next"><small>Next ▸ Day 1 · Task 4</small><b>Production Readiness Review</b></div></a>
+  </nav>
+
+  <p class="note-sim" style="margin-top:2rem">All figures on this page are generated in your browser from a seeded simulator of a
+    200-record MaintIE sample and four annotators. No backend, no external calls. Cost figures are the illustrative placeholders from the task pack.</p>
+
+</main>
+
+<footer class="footer"><div class="footer-inner"><div>Atlas Copco · Advanced AI Engineering Bootcamp — Reference Demo Gallery</div><div class="small">Day 1 · Task 3</div></div></footer>
+
+<script src="../assets/charts.js"></script>
+<script src="../assets/app.js"></script>
+<script>
+/* ---- taxonomy + fixed illustrative counts (sum to 200) ------------------- */
+const CATS = [
+  {key:"seal",  name:"seal / leak",            short:"seal", count:42, cost:1500, why:"Frequent, contained, quick"},
+  {key:"bear",  name:"bearing / rotating",     short:"bear", count:30, cost:6800, why:"Unplanned stoppage, long repair"},
+  {key:"elec",  name:"electrical / control",   short:"elec", count:26, cost:3100, why:"Diagnosis time dominates"},
+  {key:"lube",  name:"lubrication / oil",      short:"lube", count:22, cost:1200, why:"Mostly consumable replacement"},
+  {key:"cool",  name:"cooling / heat-exchange",short:"cool", count:14, cost:2400, why:"Often escalates if missed"},
+  {key:"filt",  name:"filtration / blockage",  short:"filt", count:20, cost:600,  why:"Routine"},
+  {key:"fast",  name:"fastening / alignment",  short:"fast", count:16, cost:900,  why:"Quick, but recurs"},
+  {key:"inst",  name:"instrumentation / sensing",short:"inst",count:6, cost:800,  why:"Low cost, high nuisance"},
+  {key:"uncl",  name:"unclear",                short:"uncl", count:24, cost:null, why:"Count only, never costed — a taxonomy defect"}
+];
+
+/* ---- Pairwise Cohen's kappa (4 annotators) ------------------------------- */
+function cohenChart(){
+  const M=[[1.00,0.58,0.49,0.54],[0.58,1.00,0.51,0.47],[0.49,0.51,1.00,0.55],[0.54,0.47,0.55,1.00]];
+  const labs=["A1","A2","A3","A4"];
+  AC.heatmap(document.getElementById("cohen-chart"), {
+    matrix:M, rows:labs, cols:labs, cell:64, lblL:44, lblT:26, fmt:v=>v.toFixed(2),
+    cellColor:(v)=> v>=0.999 ? AC.cssVar("--surface-3")
+                    : AC.mix(AC.cssVar("--surface-2"), AC.cssVar("--warn"), Math.pow((v-0.4)/0.6,.8))
+  });
+}
+
+/* ---- 9x9 disagreement matrix (seeded, with planted peaks) ---------------- */
+function disagreeMatrix(){
+  const n=CATS.length, M=Array.from({length:n},()=>new Array(n).fill(0));
+  const rand=AC.rng(311);
+  for(let r=0;r<n;r++)for(let c=r+1;c<n;c++){ const v=Math.round(rand()*3); M[r][c]=v; M[c][r]=v; }
+  const idx=k=>CATS.findIndex(x=>x.key===k);
+  const set=(a,b,v)=>{M[idx(a)][idx(b)]=v;M[idx(b)][idx(a)]=v;};
+  set("seal","lube",11);   // fluid on the floor
+  set("bear","fast",9);    // both vibration
+  set("cool","filt",6);    // both thermal/flow
+  set("elec","inst",5);    // both wiring
+  set("seal","uncl",4); set("elec","uncl",4); set("bear","uncl",3);
+  return M;
+}
+function disagreeChart(){
+  AC.heatmap(document.getElementById("disagree-chart"), {
+    matrix:disagreeMatrix(), rows:CATS.map(c=>c.short), cols:CATS.map(c=>c.short),
+    cell:38, lblL:44, lblT:24, fmt:v=> v||"",
+    cellColor:(v,r,c,max)=> r===c ? AC.cssVar("--surface-3")
+        : AC.mix(AC.cssVar("--surface-2"), AC.cssVar("--bad"), Math.pow(v/max,.6))
+  });
+}
+
+/* ---- Pareto charts ------------------------------------------------------- */
+function freqChart(){
+  const data=CATS.slice().sort((a,b)=>b.count-a.count)
+    .map(c=>({label:c.short, value:c.count, color: c.key==="uncl"?"var(--ink-3)":"var(--c1)"}));
+  AC.bar(document.getElementById("freq-chart"), {h:230, data, cumulative:true, ticks:4, dp:0});
+}
+function costChart(){
+  const data=CATS.filter(c=>c.cost!=null).map(c=>({...c, w:c.count*c.cost}))
+    .sort((a,b)=>b.w-a.w)
+    .map(c=>({label:c.short, value:c.w, color: c.key==="bear"?"var(--c6)":"var(--c3)"}));
+  AC.bar(document.getElementById("cost-chart"), {h:230, data, cumulative:true, ticks:4, dp:0,
+    vfmt:v=>"€"+(v/1000).toFixed(0)+"k"});
+}
+
+/* ---- cost table ---------------------------------------------------------- */
+function costTable(){
+  document.getElementById("cost-body").innerHTML = CATS.map(c=>{
+    const w = c.cost!=null ? "€ "+(c.count*c.cost).toLocaleString("en-GB") : "—";
+    const cost = c.cost!=null ? "€ "+c.cost.toLocaleString("en-GB") : "not costed";
+    return `<tr><td>${c.name}</td><td class="num">${c.count}</td><td class="num">${cost}</td><td class="num">${w}</td><td class="muted">${c.why}</td></tr>`;
+  }).join("");
+}
+
+/* ---- hypothesis backlog -------------------------------------------------- */
+const BACKLOG=[
+  {h:"Rewrite the two most-confused definitions (seal/leak vs lubrication/oil)", type:"Labelling", gain:18, conf:0.85, effort:3},
+  {h:"Adjudicate the 7 contested records with a fifth senior engineer",          type:"Labelling", gain:8,  conf:0.80, effort:2},
+  {h:"Pull the equipment-type field to slice bearing failures by machine class", type:"Data",      gain:6,  conf:0.60, effort:5},
+  {h:"Add a structured category dropdown at work-order entry (new records)",     type:"Data",      gain:10, conf:0.60, effort:10},
+  {h:"Fine-tune the classifier on adjudicated labels (only after κ is raised)",  type:"Modelling", gain:7,  conf:0.45, effort:8}
+];
+function backlog(){
+  const scored=BACKLOG.map(b=>({...b, score:+(b.gain*b.conf/b.effort).toFixed(2)}))
+    .sort((a,b)=>b.score-a.score);
+  document.getElementById("backlog-body").innerHTML = scored.map((b,i)=>{
+    const cls = b.type==="Labelling"?"b-info":b.type==="Data"?"b-warn":"b-bad";
+    return `<tr><td class="mono">${i+1}</td><td>${b.h}</td><td><span class="badge ${cls}">${b.type}</span></td>`+
+           `<td class="num">+${b.gain>10&&b.type==="Labelling"?"0.18κ":b.gain}</td><td class="num">${b.conf.toFixed(2)}</td>`+
+           `<td class="num">${b.effort}d</td><td class="num"><b>${b.score.toFixed(1)}</b></td></tr>`;
+  }).join("");
+  AC.bar(document.getElementById("backlog-chart"), {h:210, dp:1, ticks:4,
+    data:scored.map((b,i)=>({label:"#"+(i+1), value:b.score,
+      color: i===0?"var(--c5)":b.type==="Modelling"?"var(--c6)":"var(--c1)"}))});
+}
+
+function render(){
+  cohenChart(); disagreeChart(); freqChart(); costChart(); costTable(); backlog();
+}
+AC.renderAll(render);
+AC.onThemeChange(render);
+</script>
+</body>
+</html>
